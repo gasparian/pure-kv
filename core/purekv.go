@@ -152,14 +152,11 @@ func (kv *PureKv) Next(req Request, res *Response) error {
 				kv.Unlock()
 			}()
 			return nil
-		} else {
-			kv.Unlock()
 		}
 		res.Key = key
 		res.Value = kv.Maps[req.MapKey][key]
 		res.Ok = true
-	} else {
-		kv.Unlock()
 	}
+	kv.Unlock()
 	return nil
 }
