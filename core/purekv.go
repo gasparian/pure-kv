@@ -1,8 +1,7 @@
-package server
+package core
 
 import (
 	"errors"
-	"pure-kv-go/core"
 	"sync"
 )
 
@@ -27,7 +26,7 @@ func mapIterator(m mapInstance) chan string {
 }
 
 // Create instantiates a new map
-func (kv *PureKv) Create(req core.Request, res *core.Response) error {
+func (kv *PureKv) Create(req Request, res *Response) error {
 	kv.Lock()
 	defer kv.Unlock()
 	if len(req.MapKey) == 0 {
@@ -38,7 +37,7 @@ func (kv *PureKv) Create(req core.Request, res *core.Response) error {
 }
 
 // Destroy drops the entire map by key
-func (kv *PureKv) Destroy(req core.Request, res *core.Response) error {
+func (kv *PureKv) Destroy(req Request, res *Response) error {
 	kv.Lock()
 	if len(req.MapKey) == 0 {
 		return errors.New("Map key must be defined")
@@ -57,7 +56,7 @@ func (kv *PureKv) Destroy(req core.Request, res *core.Response) error {
 }
 
 // Del drops any record from map by keys
-func (kv *PureKv) Del(req core.Request, res *core.Response) error {
+func (kv *PureKv) Del(req Request, res *Response) error {
 	kv.Lock()
 	if len(req.MapKey) == 0 {
 		return errors.New("Map key must be defined")
@@ -80,7 +79,7 @@ func (kv *PureKv) Del(req core.Request, res *core.Response) error {
 }
 
 // Set just creates the new key value pair
-func (kv *PureKv) Set(req core.Request, res *core.Response) error {
+func (kv *PureKv) Set(req Request, res *Response) error {
 	kv.Lock()
 	defer kv.Unlock()
 	if len(req.MapKey) == 0 {
@@ -100,7 +99,7 @@ func (kv *PureKv) Set(req core.Request, res *core.Response) error {
 }
 
 // Get returns value by key from one of the maps
-func (kv *PureKv) Get(req core.Request, res *core.Response) error {
+func (kv *PureKv) Get(req Request, res *Response) error {
 	kv.RLock()
 	defer kv.RUnlock()
 	if len(req.MapKey) == 0 {
@@ -119,7 +118,7 @@ func (kv *PureKv) Get(req core.Request, res *core.Response) error {
 }
 
 // MakeIterator creates the new map iterator based on channel
-func (kv *PureKv) MakeIterator(req core.Request, res *core.Response) error {
+func (kv *PureKv) MakeIterator(req Request, res *Response) error {
 	kv.Lock()
 	defer kv.Unlock()
 	if len(req.MapKey) == 0 {
@@ -135,7 +134,7 @@ func (kv *PureKv) MakeIterator(req core.Request, res *core.Response) error {
 }
 
 // Next returns the next key-value pait according to the iterator state
-func (kv *PureKv) Next(req core.Request, res *core.Response) error {
+func (kv *PureKv) Next(req Request, res *Response) error {
 	kv.Lock()
 	if len(req.MapKey) == 0 {
 		return errors.New("Map key must be defined")
