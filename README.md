@@ -16,6 +16,7 @@ Should support the following operations:
 
 ### Links  
  - https://ops.tips/gists/example-go-rpc-client-and-server/  
+ - https://github.com/tensor-programming/go-basic-rpc  
 
 ### TODO  
  - server;  
