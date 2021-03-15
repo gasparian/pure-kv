@@ -16,3 +16,10 @@ Should support the following operations:
 
 ### Links  
  - https://ops.tips/gists/example-go-rpc-client-and-server/  
+
+
+### TODO  
+ - server;  
+ - client;  
+ - main runner;  
+ - add persistance (configurable) - fo example dump all maps to disk every 600 sec.;  
