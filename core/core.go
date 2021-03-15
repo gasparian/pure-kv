@@ -2,12 +2,13 @@ package core
 
 // Shortcuts for RPC methods
 const (
-	Create  = "PureKv.Create"
-	Destroy = "PureKv.Destroy"
-	Set     = "PureKv.Set"
-	Get     = "PureKv.Get"
-	Next    = "PureKv.Next"
-	Del     = "PureKv.Del"
+	Create   = "PureKv.Create"
+	Destroy  = "PureKv.Destroy"
+	Del      = "PureKv.Del"
+	Set      = "PureKv.Set"
+	Get      = "PureKv.Get"
+	MakeIter = "PureKv.MakeIterator"
+	Next     = "PureKv.Next"
 )
 
 // Record holds all needed data for each map entry
