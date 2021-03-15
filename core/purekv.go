@@ -42,15 +42,11 @@ func (kv *PureKv) Destroy(req Request, res *Response) error {
 	if len(req.MapKey) == 0 {
 		return errors.New("Map key must be defined")
 	}
-	_, ok := kv.Maps[req.MapKey]
-	if ok {
-		go func() {
-			delete(kv.Maps, req.MapKey)
-			kv.Unlock()
-		}()
-	} else {
+	go func() {
+		delete(kv.Maps, req.MapKey)
+		delete(kv.Iterators, req.MapKey)
 		kv.Unlock()
-	}
+	}()
 	res.Ok = true
 	return nil
 }
@@ -63,17 +59,13 @@ func (kv *PureKv) Del(req Request, res *Response) error {
 	}
 	_, ok := kv.Maps[req.MapKey]
 	if !ok {
+		kv.Unlock()
 		return nil
 	}
-	_, ok = kv.Maps[req.MapKey][req.Key]
-	if ok {
-		go func() {
-			delete(kv.Maps[req.MapKey], req.Key)
-			kv.Unlock()
-		}()
-	} else {
+	go func() {
+		delete(kv.Maps[req.MapKey], req.Key)
 		kv.Unlock()
-	}
+	}()
 	res.Ok = true
 	return nil
 }
