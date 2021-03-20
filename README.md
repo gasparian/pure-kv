@@ -2,9 +2,9 @@
 Simple in-memory key-value storage with RPC interface, written in pure go  
 
 ## Proposal  
-This storage must be a RPC service, that can create and store go maps on it's side.  
-The data exchange format must be in binary format, over tcp.  
-No third-party libraries must be used.  
+This is must be a RPC service, that can create and store go maps on it's side.  
+The data must be exchanged in binary format, over tcp.  
+No third-party libraries allowed.  
 
 Should support the following operations:  
  - `CREATE`: creates the new map with specified key-value pair type;  

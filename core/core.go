@@ -26,5 +26,5 @@ type Response struct {
 // Request holds keys and values, all optional
 type Request struct {
 	Record
-	MapKey string
+	Bucket string
 }

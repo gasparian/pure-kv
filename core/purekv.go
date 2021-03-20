@@ -11,10 +11,11 @@ type mapInstance map[string][]byte
 type PureKv struct {
 	sync.RWMutex
 	Iterators map[string]chan string
-	Maps      map[string]mapInstance
+	Buckets   map[string]mapInstance
 }
 
-func mapIterator(m mapInstance) chan string {
+// mapKeysIterator creates a channel which holds keys of the map
+func mapKeysIterator(m mapInstance) chan string {
 	c := make(chan string)
 	go func() {
 		for k := range m {
@@ -29,22 +30,23 @@ func mapIterator(m mapInstance) chan string {
 func (kv *PureKv) Create(req Request, res *Response) error {
 	kv.Lock()
 	defer kv.Unlock()
-	if len(req.MapKey) == 0 {
+	if len(req.Bucket) == 0 {
 		return errors.New("Map key must be defined")
 	}
-	kv.Maps[req.MapKey] = make(mapInstance)
+	kv.Buckets[req.Bucket] = make(mapInstance)
 	return nil
 }
 
 // Destroy drops the entire map by key
 func (kv *PureKv) Destroy(req Request, res *Response) error {
 	kv.Lock()
-	if len(req.MapKey) == 0 {
+	if len(req.Bucket) == 0 {
+		kv.Unlock()
 		return errors.New("Map key must be defined")
 	}
 	go func() {
-		delete(kv.Maps, req.MapKey)
-		delete(kv.Iterators, req.MapKey)
+		delete(kv.Buckets, req.Bucket)
+		delete(kv.Iterators, req.Bucket)
 		kv.Unlock()
 	}()
 	res.Ok = true
@@ -54,16 +56,17 @@ func (kv *PureKv) Destroy(req Request, res *Response) error {
 // Del drops any record from map by keys
 func (kv *PureKv) Del(req Request, res *Response) error {
 	kv.Lock()
-	if len(req.MapKey) == 0 {
+	if len(req.Bucket) == 0 {
+		kv.Unlock()
 		return errors.New("Map key must be defined")
 	}
-	_, ok := kv.Maps[req.MapKey]
+	_, ok := kv.Buckets[req.Bucket]
 	if !ok {
 		kv.Unlock()
 		return nil
 	}
 	go func() {
-		delete(kv.Maps[req.MapKey], req.Key)
+		delete(kv.Buckets[req.Bucket], req.Key)
 		kv.Unlock()
 	}()
 	res.Ok = true
@@ -74,15 +77,15 @@ func (kv *PureKv) Del(req Request, res *Response) error {
 func (kv *PureKv) Set(req Request, res *Response) error {
 	kv.Lock()
 	defer kv.Unlock()
-	if len(req.MapKey) == 0 {
+	if len(req.Bucket) == 0 {
 		return errors.New("Map key must be defined")
 	}
 	if len(req.Value) > 0 {
-		_, ok := kv.Maps[req.MapKey]
+		_, ok := kv.Buckets[req.Bucket]
 		if !ok {
 			return errors.New("Map cannot be found")
 		}
-		kv.Maps[req.MapKey][req.Key] = req.Value
+		kv.Buckets[req.Bucket][req.Key] = req.Value
 		res.Ok = true
 	} else {
 		return errors.New("Both key and value must be defined")
@@ -94,14 +97,14 @@ func (kv *PureKv) Set(req Request, res *Response) error {
 func (kv *PureKv) Get(req Request, res *Response) error {
 	kv.RLock()
 	defer kv.RUnlock()
-	if len(req.MapKey) == 0 {
+	if len(req.Bucket) == 0 {
 		return errors.New("Map key must be defined")
 	}
-	_, ok := kv.Maps[req.MapKey]
+	_, ok := kv.Buckets[req.Bucket]
 	if !ok {
 		return nil
 	}
-	val, ok := kv.Maps[req.MapKey][req.Key]
+	val, ok := kv.Buckets[req.Bucket][req.Key]
 	if ok {
 		res.Value = val
 		res.Ok = true
@@ -113,40 +116,42 @@ func (kv *PureKv) Get(req Request, res *Response) error {
 func (kv *PureKv) MakeIterator(req Request, res *Response) error {
 	kv.Lock()
 	defer kv.Unlock()
-	if len(req.MapKey) == 0 {
+	if len(req.Bucket) == 0 {
 		return errors.New("Map key must be defined")
 	}
-	_, ok := kv.Maps[req.MapKey]
+	_, ok := kv.Buckets[req.Bucket]
 	if !ok {
 		return errors.New("Map cannot be found")
 	}
-	kv.Iterators[req.MapKey] = mapIterator(kv.Maps[req.MapKey])
+	kv.Iterators[req.Bucket] = mapKeysIterator(kv.Buckets[req.Bucket])
 	res.Ok = true
 	return nil
 }
 
-// Next returns the next key-value pait according to the iterator state
+// Next returns the next key-value pair according to the iterator state
 func (kv *PureKv) Next(req Request, res *Response) error {
 	kv.Lock()
-	if len(req.MapKey) == 0 {
+	if len(req.Bucket) == 0 {
+		kv.Unlock()
 		return errors.New("Map key must be defined")
 	}
-	_, ok := kv.Maps[req.MapKey]
+	_, ok := kv.Buckets[req.Bucket]
 	if !ok {
+		kv.Unlock()
 		return errors.New("Map cannot be found")
 	}
-	_, ok = kv.Iterators[req.MapKey]
+	_, ok = kv.Iterators[req.Bucket]
 	if ok {
-		key, ok := <-kv.Iterators[req.MapKey]
+		key, ok := <-kv.Iterators[req.Bucket]
 		if !ok {
 			go func() {
-				delete(kv.Iterators, req.MapKey)
+				delete(kv.Iterators, req.Bucket)
 				kv.Unlock()
 			}()
 			return nil
 		}
 		res.Key = key
-		res.Value = kv.Maps[req.MapKey][key]
+		res.Value = kv.Buckets[req.Bucket][key]
 		res.Ok = true
 	}
 	kv.Unlock()
