@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -236,37 +237,41 @@ func (kv *PureKv) Next(req Request, res *Response) error {
 }
 
 // Dump serilizes buckets and write to disk in parallel
-func (kv *PureKv) Dump(path string, dummy *interface{}) error {
+func Dump(kv *PureKv, path string) {
 	kv.mx.RLock()
 	defer kv.mx.RUnlock()
 
 	for k, v := range kv.Buckets {
-		// TODO: add error handling
-		go v.SaveBucket(filepath.Join(path, k))
+		go func(bucketName string, bucket BucketInstance) {
+			err := bucket.SaveBucket(filepath.Join(path, bucketName))
+			if err != nil {
+				log.Panicln(err)
+			}
+		}(k, v)
 	}
-	return nil
 }
 
 // Load loads buckets from disk by given dir. path
-func (kv *PureKv) Load(path string, dummy *interface{}) error {
+func Load(kv *PureKv, path string) {
 	kv.mx.Lock()
 	defer kv.mx.Unlock()
 
 	_ = os.Mkdir(path, 0700)
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
-		return err
+		log.Panicln(err)
 	}
 	for _, file := range files {
 		if !file.IsDir() {
-			// TODO: add error handling
 			go func() {
 				fname := file.Name()
 				tempBucket := make(BucketInstance)
 				err = tempBucket.LoadBucket(filepath.Join(path, fname))
+				if err != nil {
+					log.Panicln(err)
+				}
 				kv.Buckets[fname] = tempBucket
 			}()
 		}
 	}
-	return nil
 }

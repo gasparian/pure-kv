@@ -8,7 +8,7 @@ Service that can create and store go maps with byte arrays as values.
 Has the following properties:  
  * RPC interface.  
  * Persistant.  
- * Supports iteration over maps.  
+ * Supports iteration over maps ("buckets").  
  * No third-party libraries has been used.  
 
 ### API  

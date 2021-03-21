@@ -41,22 +41,15 @@ func (s *Server) Close() error {
 }
 
 // LoadDb loads db using specified path
-func (s *Server) LoadDb() error {
-	err := s.db.Load(s.DbPath, nil)
-	if err != nil {
-		return err
-	}
-	return nil
+func (s *Server) LoadDb() {
+	core.Load(s.db, s.DbPath)
 }
 
 // Persist dumps db on disk periodically
-func (s *Server) Persist() error {
+func (s *Server) Persist() {
 	for {
 		time.Sleep(time.Duration(s.PersistanceTimeout) * time.Second)
-		err := s.db.Dump(s.DbPath, nil)
-		if err != nil {
-			return err
-		}
+		core.Dump(s.db, s.DbPath)
 	}
 }
 
@@ -80,10 +73,7 @@ func (s *Server) StartRPC() (err error) {
 func (s *Server) Run() {
 	defer s.Close()
 
-	err := s.LoadDb()
-	if err != nil {
-		log.Panicln(err)
-	}
+	s.LoadDb()
 
 	go func() {
 		core.HandleSignals()
@@ -92,9 +82,9 @@ func (s *Server) Run() {
 		os.Exit(0)
 	}()
 
-	go s.Persist() // TODO: add error handling
+	go s.Persist()
 
-	err = s.StartRPC()
+	err := s.StartRPC()
 	if err != nil {
 		log.Panicln(err)
 	}
