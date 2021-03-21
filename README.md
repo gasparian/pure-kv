@@ -4,9 +4,12 @@ Simple in-memory key-value storage with RPC interface, written in go.
 <p align="center"> <img src="https://github.com/gasparian/pure-kv-go/blob/main/pics/logo.jpg" height=300/> </p>  
 
 ## Reference  
-This is RPC service, that can create and store go maps with byte arrays.  
-No third-party libraries has been used.  
-Persistance included.  
+Service that can create and store go maps with byte arrays as values.  
+Has the following properties:  
+ * RPC interface.  
+ * Persistant.  
+ * Supports iteration over maps.  
+ * No third-party libraries has been used.  
 
 ### API  
  - `CREATE`: creates the new map with specified key-value pair type;  

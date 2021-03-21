@@ -79,7 +79,7 @@ func (m *BucketInstance) LoadBucket(path string) error {
 
 // PureKv main structure for holding maps and key iterators
 type PureKv struct {
-	sync.RWMutex
+	mx        *sync.RWMutex
 	Iterators map[string]chan string
 	Buckets   map[string]BucketInstance
 }
@@ -96,10 +96,17 @@ func mapKeysIterator(m BucketInstance) chan string {
 	return c
 }
 
+// InitPureKv creates PureKv instance with initialized mutex
+func InitPureKv() *PureKv {
+	return &PureKv{
+		mx: new(sync.RWMutex),
+	}
+}
+
 // Create instantiates a new map
 func (kv *PureKv) Create(req Request, res *Response) error {
-	kv.Lock()
-	defer kv.Unlock()
+	kv.mx.Lock()
+	defer kv.mx.Unlock()
 	if len(req.Bucket) == 0 {
 		return errors.New("Map key must be defined")
 	}
@@ -109,15 +116,15 @@ func (kv *PureKv) Create(req Request, res *Response) error {
 
 // Destroy drops the entire map by key
 func (kv *PureKv) Destroy(req Request, res *Response) error {
-	kv.Lock()
+	kv.mx.Lock()
 	if len(req.Bucket) == 0 {
-		kv.Unlock()
+		kv.mx.Unlock()
 		return errors.New("Map key must be defined")
 	}
 	go func() {
 		delete(kv.Buckets, req.Bucket)
 		delete(kv.Iterators, req.Bucket)
-		kv.Unlock()
+		kv.mx.Unlock()
 	}()
 	res.Ok = true
 	return nil
@@ -125,19 +132,19 @@ func (kv *PureKv) Destroy(req Request, res *Response) error {
 
 // Del drops any record from map by keys
 func (kv *PureKv) Del(req Request, res *Response) error {
-	kv.Lock()
+	kv.mx.Lock()
 	if len(req.Bucket) == 0 {
-		kv.Unlock()
+		kv.mx.Unlock()
 		return errors.New("Map key must be defined")
 	}
 	_, ok := kv.Buckets[req.Bucket]
 	if !ok {
-		kv.Unlock()
+		kv.mx.Unlock()
 		return nil
 	}
 	go func() {
 		delete(kv.Buckets[req.Bucket], req.Key)
-		kv.Unlock()
+		kv.mx.Unlock()
 	}()
 	res.Ok = true
 	return nil
@@ -145,8 +152,8 @@ func (kv *PureKv) Del(req Request, res *Response) error {
 
 // Set just creates the new key value pair
 func (kv *PureKv) Set(req Request, res *Response) error {
-	kv.Lock()
-	defer kv.Unlock()
+	kv.mx.Lock()
+	defer kv.mx.Unlock()
 	if len(req.Bucket) == 0 {
 		return errors.New("Map key must be defined")
 	}
@@ -165,8 +172,8 @@ func (kv *PureKv) Set(req Request, res *Response) error {
 
 // Get returns value by key from one of the maps
 func (kv *PureKv) Get(req Request, res *Response) error {
-	kv.RLock()
-	defer kv.RUnlock()
+	kv.mx.RLock()
+	defer kv.mx.RUnlock()
 	if len(req.Bucket) == 0 {
 		return errors.New("Map key must be defined")
 	}
@@ -184,8 +191,8 @@ func (kv *PureKv) Get(req Request, res *Response) error {
 
 // MakeIterator creates the new map iterator based on channel
 func (kv *PureKv) MakeIterator(req Request, res *Response) error {
-	kv.Lock()
-	defer kv.Unlock()
+	kv.mx.Lock()
+	defer kv.mx.Unlock()
 	if len(req.Bucket) == 0 {
 		return errors.New("Map key must be defined")
 	}
@@ -200,14 +207,14 @@ func (kv *PureKv) MakeIterator(req Request, res *Response) error {
 
 // Next returns the next key-value pair according to the iterator state
 func (kv *PureKv) Next(req Request, res *Response) error {
-	kv.Lock()
+	kv.mx.Lock()
 	if len(req.Bucket) == 0 {
-		kv.Unlock()
+		kv.mx.Unlock()
 		return errors.New("Map key must be defined")
 	}
 	_, ok := kv.Buckets[req.Bucket]
 	if !ok {
-		kv.Unlock()
+		kv.mx.Unlock()
 		return errors.New("Map cannot be found")
 	}
 	_, ok = kv.Iterators[req.Bucket]
@@ -216,7 +223,7 @@ func (kv *PureKv) Next(req Request, res *Response) error {
 		if !ok {
 			go func() {
 				delete(kv.Iterators, req.Bucket)
-				kv.Unlock()
+				kv.mx.Unlock()
 			}()
 			return nil
 		}
@@ -224,14 +231,14 @@ func (kv *PureKv) Next(req Request, res *Response) error {
 		res.Value = kv.Buckets[req.Bucket][key]
 		res.Ok = true
 	}
-	kv.Unlock()
+	kv.mx.Unlock()
 	return nil
 }
 
 // Dump serilizes buckets and write to disk in parallel
-func (kv *PureKv) Dump(path string) error {
-	kv.RLock()
-	defer kv.RUnlock()
+func (kv *PureKv) Dump(path string, dummy *interface{}) error {
+	kv.mx.RLock()
+	defer kv.mx.RUnlock()
 
 	for k, v := range kv.Buckets {
 		// TODO: add error handling
@@ -241,10 +248,11 @@ func (kv *PureKv) Dump(path string) error {
 }
 
 // Load loads buckets from disk by given dir. path
-func (kv *PureKv) Load(path string) error {
-	kv.Lock()
-	defer kv.Unlock()
+func (kv *PureKv) Load(path string, dummy *interface{}) error {
+	kv.mx.Lock()
+	defer kv.mx.Unlock()
 
+	_ = os.Mkdir(path, 0700)
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
 		return err
