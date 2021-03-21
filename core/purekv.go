@@ -5,15 +5,17 @@ import (
 	"encoding/gob"
 	"errors"
 	"io"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"sync"
 )
 
-// MapInstance holds the bucket data itself
-type MapInstance map[string][]byte
+// BucketInstance holds the bucket data itself
+type BucketInstance map[string][]byte
 
 // SerializeBucket encodes bucket as the byte array
-func (m *MapInstance) SerializeBucket() ([]byte, error) {
+func (m *BucketInstance) SerializeBucket() ([]byte, error) {
 	buf := &bytes.Buffer{}
 	enc := gob.NewEncoder(buf)
 	err := enc.Encode(m)
@@ -24,7 +26,7 @@ func (m *MapInstance) SerializeBucket() ([]byte, error) {
 }
 
 // SaveBucket dumps bucket to disk
-func (m *MapInstance) SaveBucket(path string) error {
+func (m *BucketInstance) SaveBucket(path string) error {
 	f, err := os.Create(path)
 	if err != nil {
 		return err
@@ -45,7 +47,7 @@ func (m *MapInstance) SaveBucket(path string) error {
 }
 
 // Deserialize converts byte array to bucket
-func (m *MapInstance) Deserialize(inp []byte) error {
+func (m *BucketInstance) Deserialize(inp []byte) error {
 	buf := &bytes.Buffer{}
 	buf.Write(inp)
 	dec := gob.NewDecoder(buf)
@@ -57,7 +59,7 @@ func (m *MapInstance) Deserialize(inp []byte) error {
 }
 
 // LoadBucket loads byte array from file
-func (m *MapInstance) LoadBucket(path string) error {
+func (m *BucketInstance) LoadBucket(path string) error {
 	buf := &bytes.Buffer{}
 	f, err := os.Open(path)
 	if err != nil {
@@ -79,11 +81,11 @@ func (m *MapInstance) LoadBucket(path string) error {
 type PureKv struct {
 	sync.RWMutex
 	Iterators map[string]chan string
-	Buckets   map[string]MapInstance
+	Buckets   map[string]BucketInstance
 }
 
 // mapKeysIterator creates a channel which holds keys of the map
-func mapKeysIterator(m MapInstance) chan string {
+func mapKeysIterator(m BucketInstance) chan string {
 	c := make(chan string)
 	go func() {
 		for k := range m {
@@ -101,7 +103,7 @@ func (kv *PureKv) Create(req Request, res *Response) error {
 	if len(req.Bucket) == 0 {
 		return errors.New("Map key must be defined")
 	}
-	kv.Buckets[req.Bucket] = make(MapInstance)
+	kv.Buckets[req.Bucket] = make(BucketInstance)
 	return nil
 }
 
@@ -223,5 +225,40 @@ func (kv *PureKv) Next(req Request, res *Response) error {
 		res.Ok = true
 	}
 	kv.Unlock()
+	return nil
+}
+
+// Dump serilizes buckets and write to disk in parallel
+func (kv *PureKv) Dump(path string) error {
+	kv.RLock()
+	defer kv.RUnlock()
+
+	for k, v := range kv.Buckets {
+		// TODO: add error handling
+		go v.SaveBucket(filepath.Join(path, k))
+	}
+	return nil
+}
+
+// Load loads buckets from disk by given dir. path
+func (kv *PureKv) Load(path string) error {
+	kv.Lock()
+	defer kv.Unlock()
+
+	files, err := ioutil.ReadDir(path)
+	if err != nil {
+		return err
+	}
+	for _, file := range files {
+		if !file.IsDir() {
+			// TODO: add error handling
+			go func() {
+				fname := file.Name()
+				tempBucket := make(BucketInstance)
+				err = tempBucket.LoadBucket(filepath.Join(path, fname))
+				kv.Buckets[fname] = tempBucket
+			}()
+		}
+	}
 	return nil
 }

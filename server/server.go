@@ -2,12 +2,10 @@ package server
 
 import (
 	"errors"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/rpc"
 	"os"
-	"path/filepath"
 	"pure-kv-go/core"
 	"strconv"
 )
@@ -43,41 +41,6 @@ func (s *Server) Start() (err error) {
 	log.Println("Server started")
 	rpc.Accept(s.listener)
 	return
-}
-
-// Dump serilizes buckets and write to disk in parallel
-func (s *Server) Dump(path string) error {
-	s.db.RLock()
-	defer s.db.RUnlock()
-
-	for k, v := range s.db.Buckets {
-		// TODO: add error handling
-		go v.SaveBucket(filepath.Join(path, k))
-	}
-	return nil
-}
-
-// Load loads buckets from disk by given dir. path
-func (s *Server) Load(path string) error {
-	s.db.Lock()
-	defer s.db.Unlock()
-
-	files, err := ioutil.ReadDir(path)
-	if err != nil {
-		return err
-	}
-	for _, file := range files {
-		if !file.IsDir() {
-			// TODO: add error handling
-			go func() {
-				fname := file.Name()
-				tempBucket := make(core.MapInstance)
-				err = tempBucket.LoadBucket(filepath.Join(path, fname))
-				s.db.Buckets[fname] = tempBucket
-			}()
-		}
-	}
-	return nil
 }
 
 // RunServer runs RPC sercer and stops it
