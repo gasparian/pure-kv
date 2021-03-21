@@ -159,7 +159,7 @@ func (c *Client) MakeIterator(bucketName string) error {
 }
 
 // Next makes RPC that returns the next key-value pair according to the iterator state
-func (c *Client) Next(bucketName string) ([]byte, error) {
+func (c *Client) Next(bucketName string) (string, []byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 	request := &core.Request{
@@ -167,7 +167,7 @@ func (c *Client) Next(bucketName string) ([]byte, error) {
 	}
 	resp := c.executeWrapper(ctx, core.Next, request)
 	if resp == nil {
-		return nil, errors.New("unable to set the key-value pair")
+		return "", nil, errors.New("unable to set the key-value pair")
 	}
-	return resp.Value, nil
+	return resp.Key, resp.Value, nil
 }

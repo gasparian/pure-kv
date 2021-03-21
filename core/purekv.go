@@ -1,21 +1,89 @@
 package core
 
 import (
+	"bytes"
+	"encoding/gob"
 	"errors"
+	"io"
+	"os"
 	"sync"
 )
 
-type mapInstance map[string][]byte
+// MapInstance holds the bucket data itself
+type MapInstance map[string][]byte
+
+// SerializeBucket encodes bucket as the byte array
+func (m *MapInstance) SerializeBucket() ([]byte, error) {
+	buf := &bytes.Buffer{}
+	enc := gob.NewEncoder(buf)
+	err := enc.Encode(m)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// SaveBucket dumps bucket to disk
+func (m *MapInstance) SaveBucket(path string) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	dump, err := m.SerializeBucket()
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(dump); err != nil {
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Deserialize converts byte array to bucket
+func (m *MapInstance) Deserialize(inp []byte) error {
+	buf := &bytes.Buffer{}
+	buf.Write(inp)
+	dec := gob.NewDecoder(buf)
+	err := dec.Decode(m)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// LoadBucket loads byte array from file
+func (m *MapInstance) LoadBucket(path string) error {
+	buf := &bytes.Buffer{}
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(buf, f)
+	if err != nil {
+		return err
+	}
+	f.Close()
+	err = m.Deserialize(buf.Bytes())
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
 // PureKv main structure for holding maps and key iterators
 type PureKv struct {
 	sync.RWMutex
 	Iterators map[string]chan string
-	Buckets   map[string]mapInstance
+	Buckets   map[string]MapInstance
 }
 
 // mapKeysIterator creates a channel which holds keys of the map
-func mapKeysIterator(m mapInstance) chan string {
+func mapKeysIterator(m MapInstance) chan string {
 	c := make(chan string)
 	go func() {
 		for k := range m {
@@ -33,7 +101,7 @@ func (kv *PureKv) Create(req Request, res *Response) error {
 	if len(req.Bucket) == 0 {
 		return errors.New("Map key must be defined")
 	}
-	kv.Buckets[req.Bucket] = make(mapInstance)
+	kv.Buckets[req.Bucket] = make(MapInstance)
 	return nil
 }
 
