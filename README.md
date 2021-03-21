@@ -1,7 +1,7 @@
 # pure-kv-go  
 Simple in-memory key-value storage with RPC interface, written in pure go  
 
-<p align="center"> <img src="https://github.com/gasparian/pure-kv-go/blob/main/pics/logo.jpg" height=320/> </p>  
+<p align="center"> <img src="https://github.com/gasparian/pure-kv-go/blob/main/pics/logo.jpg" height=300/> </p>  
 
 ## Proposal  
 This is must be a RPC service, that can create and store go maps on it's side.  
