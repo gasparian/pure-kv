@@ -2,14 +2,14 @@ package main
 
 import (
 	"flag"
+	"pure-kv-go/server"
 )
 
 var (
-	port     = flag.Uint("port", 1337, "port to listen or connect to for rpc calls")
-	isServer = flag.Bool("server", false, "activates server mode")
+	port = flag.Int("port", 6666, "port to listen for rpc calls")
 )
 
 func main() {
-	// TODO: run client or server here
-
+	flag.Parse()
+	server.RunServer(*port)
 }

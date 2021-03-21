@@ -15,13 +15,10 @@ Should support the following operations:
  - `DESTROY`: async. delete the specified map;  
 
 ### Links  
- - https://ops.tips/gists/example-go-rpc-client-and-server/  
  - https://github.com/tensor-programming/go-basic-rpc  
 
 ### TODO  
- - server;  
- - client;  
- - main runner;  
+ - main runner for server;  
  - tests;  
  - github actions and badges;  
  - add persistance (configurable) - fo example dump all maps to disk every 600 sec.;  
