@@ -8,6 +8,7 @@ Has the following properties:
  * uses RPC interface.  
  * Stores byte arrays only.  
  * Persistant.  
+ * Uses concurrency-effective maps.  
  * Supports iteration over maps ("buckets").  
  * No third-party libraries has been used.  
 
@@ -20,6 +21,7 @@ Has the following properties:
  - `DESTROY`: async. delete the specified map;  
 
 ### TODO  
+ - delete buckets from the disk too;  
  - tests;  
  - implement more concurrent-effective map, like adding the sharding as it has been done [here](https://github.com/orcaman/concurrent-map);  
  - github actions and badges;  
