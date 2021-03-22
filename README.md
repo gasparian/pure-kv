@@ -4,9 +4,9 @@ Simple in-memory key-value storage with RPC interface, written in go.
 <p align="center"> <img src="https://github.com/gasparian/pure-kv-go/blob/main/pics/logo.jpg" height=300/> </p>  
 
 ## Reference  
-Service that can create and store go maps with byte arrays as values.  
 Has the following properties:  
- * RPC interface.  
+ * uses RPC interface.  
+ * Stores byte arrays only.  
  * Persistant.  
  * Supports iteration over maps ("buckets").  
  * No third-party libraries has been used.  
@@ -21,5 +21,5 @@ Has the following properties:
 
 ### TODO  
  - tests;  
- - implement more concurrent-effective map, like [here](https://github.com/orcaman/concurrent-map);  
+ - implement more concurrent-effective map, like adding the sharding as it has been done [here](https://github.com/orcaman/concurrent-map);  
  - github actions and badges;  
