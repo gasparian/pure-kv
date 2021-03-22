@@ -12,10 +12,6 @@ import (
 	"sync"
 )
 
-const (
-	FileMode = 0700
-)
-
 // BucketInstance holds the bucket data itself
 type BucketInstance map[string][]byte
 

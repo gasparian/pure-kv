@@ -15,6 +15,8 @@ const (
 	Get      = "PureKv.Get"
 	MakeIter = "PureKv.MakeIterator"
 	Next     = "PureKv.Next"
+	// Default files creation mode
+	FileMode = 0700
 )
 
 // Record holds all needed data for each map entry
