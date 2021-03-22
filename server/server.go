@@ -20,6 +20,12 @@ type Server struct {
 	listener           net.Listener
 }
 
+// CleanDir removes all contents of the directory
+func (s *Server) CleanDir() {
+	os.RemoveAll(s.DbPath)
+	os.MkdirAll(s.DbPath, core.FileMode)
+}
+
 // InitServer creates a new instance of Server
 func InitServer(port, persistanceTimeout int, dbPath string) *Server {
 	srv := &Server{
@@ -42,14 +48,14 @@ func (s *Server) Close() error {
 
 // LoadDb loads db using specified path
 func (s *Server) LoadDb() {
-	core.Load(s.db, s.DbPath)
+	core.LoadDb(s.db, s.DbPath)
 }
 
 // Persist dumps db on disk periodically
 func (s *Server) Persist() {
 	for {
+		core.DumpDb(s.db, s.DbPath)
 		time.Sleep(time.Duration(s.PersistanceTimeout) * time.Second)
-		core.Dump(s.db, s.DbPath)
 	}
 }
 
@@ -82,6 +88,7 @@ func (s *Server) Run() {
 		os.Exit(0)
 	}()
 
+	s.CleanDir()
 	go s.Persist()
 
 	err := s.StartRPC()

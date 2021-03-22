@@ -12,6 +12,10 @@ import (
 	"sync"
 )
 
+const (
+	FileMode = 0700
+)
+
 // BucketInstance holds the bucket data itself
 type BucketInstance map[string][]byte
 
@@ -236,8 +240,8 @@ func (kv *PureKv) Next(req Request, res *Response) error {
 	return nil
 }
 
-// Dump serilizes buckets and write to disk in parallel
-func Dump(kv *PureKv, path string) {
+// DumpDb serilizes buckets and write to disk in parallel
+func DumpDb(kv *PureKv, path string) {
 	kv.mx.RLock()
 	defer kv.mx.RUnlock()
 
@@ -251,12 +255,12 @@ func Dump(kv *PureKv, path string) {
 	}
 }
 
-// Load loads buckets from disk by given dir. path
-func Load(kv *PureKv, path string) {
+// LoadDb loads buckets from disk by given dir. path
+func LoadDb(kv *PureKv, path string) {
 	kv.mx.Lock()
 	defer kv.mx.Unlock()
 
-	_ = os.Mkdir(path, 0700)
+	_ = os.MkdirAll(path, FileMode)
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
 		log.Panicln(err)
