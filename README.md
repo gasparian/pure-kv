@@ -21,4 +21,5 @@ Has the following properties:
 
 ### TODO  
  - tests;  
+ - implement more concurrent-effective map, like [here](https://github.com/orcaman/concurrent-map);  
  - github actions and badges;  
