@@ -256,7 +256,7 @@ func LoadDb(kv *PureKv, path string) {
 	kv.mx.Lock()
 	defer kv.mx.Unlock()
 
-	_ = os.MkdirAll(path, FileMode)
+	os.MkdirAll(path, FileMode)
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
 		log.Panicln(err)
