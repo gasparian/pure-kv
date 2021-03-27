@@ -241,6 +241,10 @@ func DumpDb(kv *PureKv, path string) {
 	kv.mx.RLock()
 	defer kv.mx.RUnlock()
 
+	stored, err := getDirFilesSet(path)
+	if err != nil {
+		log.Panicln(err)
+	}
 	for k, v := range kv.Buckets {
 		go func(bucketName string, bucket BucketInstance) {
 			err := bucket.SaveBucket(filepath.Join(path, bucketName))
@@ -248,6 +252,11 @@ func DumpDb(kv *PureKv, path string) {
 				log.Panicln(err)
 			}
 		}(k, v)
+	}
+	filesToDrop := setsDifference(stored, kv.Buckets)
+	for _, fname := range filesToDrop {
+		fpath := filepath.Join(path, fname)
+		os.Remove(fpath)
 	}
 }
 
@@ -274,4 +283,33 @@ func LoadDb(kv *PureKv, path string) {
 			}()
 		}
 	}
+}
+
+func getDirFilesSet(path string) (map[string]bool, error) {
+	files, err := ioutil.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[string]bool)
+	for _, file := range files {
+		if !file.IsDir() {
+			result[file.Name()] = true
+		}
+	}
+	return result, nil
+}
+
+func setsDifference(filesSet map[string]bool, buckets map[string]BucketInstance) []string {
+	var diff []string
+	for k := range filesSet {
+		if _, ok := buckets[k]; !ok {
+			diff = append(diff, k)
+		}
+	}
+	for k := range buckets {
+		if _, ok := filesSet[k]; !ok {
+			diff = append(diff, k)
+		}
+	}
+	return diff
 }
