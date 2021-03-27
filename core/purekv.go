@@ -253,7 +253,7 @@ func DumpDb(kv *PureKv, path string) {
 			}
 		}(k, v)
 	}
-	filesToDrop := setsDifference(stored, kv.Buckets)
+	filesToDrop := fnamesSetsDifference(stored, kv.Buckets)
 	for _, fname := range filesToDrop {
 		fpath := filepath.Join(path, fname)
 		os.Remove(fpath)
@@ -299,7 +299,7 @@ func getDirFilesSet(path string) (map[string]bool, error) {
 	return result, nil
 }
 
-func setsDifference(filesSet map[string]bool, buckets map[string]BucketInstance) []string {
+func fnamesSetsDifference(filesSet map[string]bool, buckets map[string]BucketInstance) []string {
 	var diff []string
 	for k := range filesSet {
 		if _, ok := buckets[k]; !ok {
