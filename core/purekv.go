@@ -1,10 +1,7 @@
 package core
 
 import (
-	"bytes"
-	"encoding/gob"
 	"errors"
-	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -12,89 +9,11 @@ import (
 	"sync"
 )
 
-// BucketInstance holds the bucket data itself
-type BucketInstance map[string][]byte
-
-// SerializeBucket encodes bucket as the byte array
-func (m *BucketInstance) SerializeBucket() ([]byte, error) {
-	buf := &bytes.Buffer{}
-	enc := gob.NewEncoder(buf)
-	err := enc.Encode(m)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-// SaveBucket dumps bucket to disk
-func (m *BucketInstance) SaveBucket(path string) error {
-	f, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	dump, err := m.SerializeBucket()
-	if err != nil {
-		return err
-	}
-	if _, err := f.Write(dump); err != nil {
-		return err
-	}
-	if err := f.Sync(); err != nil {
-		return err
-	}
-	return nil
-}
-
-// Deserialize converts byte array to bucket
-func (m *BucketInstance) Deserialize(inp []byte) error {
-	buf := &bytes.Buffer{}
-	buf.Write(inp)
-	dec := gob.NewDecoder(buf)
-	err := dec.Decode(m)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// LoadBucket loads byte array from file
-func (m *BucketInstance) LoadBucket(path string) error {
-	buf := &bytes.Buffer{}
-	f, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	_, err = io.Copy(buf, f)
-	if err != nil {
-		return err
-	}
-	f.Close()
-	err = m.Deserialize(buf.Bytes())
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 // PureKv main structure for holding maps and key iterators
 type PureKv struct {
 	mx        *sync.RWMutex
 	Iterators map[string]chan string
 	Buckets   map[string]BucketInstance
-}
-
-// mapKeysIterator creates a channel which holds keys of the map
-func mapKeysIterator(m BucketInstance) chan string {
-	c := make(chan string)
-	go func() {
-		for k := range m {
-			c <- k
-		}
-		close(c)
-	}()
-	return c
 }
 
 // InitPureKv creates PureKv instance with initialized mutex
@@ -111,7 +30,7 @@ func (kv *PureKv) Create(req Request, res *Response) error {
 	if len(req.Bucket) == 0 {
 		return errors.New("Map key must be defined")
 	}
-	kv.Buckets[req.Bucket] = make(BucketInstance)
+	kv.Buckets[req.Bucket] = make(BucketInstance) // TODO: concurrent map
 	return nil
 }
 
@@ -132,6 +51,7 @@ func (kv *PureKv) Destroy(req Request, res *Response) error {
 }
 
 // Del drops any record from map by keys
+// TODO: concurrent map
 func (kv *PureKv) Del(req Request, res *Response) error {
 	kv.mx.Lock()
 	if len(req.Bucket) == 0 {
@@ -152,6 +72,7 @@ func (kv *PureKv) Del(req Request, res *Response) error {
 }
 
 // Set just creates the new key value pair
+// TODO: concurrent map
 func (kv *PureKv) Set(req Request, res *Response) error {
 	kv.mx.Lock()
 	defer kv.mx.Unlock()
@@ -172,6 +93,7 @@ func (kv *PureKv) Set(req Request, res *Response) error {
 }
 
 // Get returns value by key from one of the maps
+// TODO: concurrent map
 func (kv *PureKv) Get(req Request, res *Response) error {
 	kv.mx.RLock()
 	defer kv.mx.RUnlock()
@@ -191,6 +113,7 @@ func (kv *PureKv) Get(req Request, res *Response) error {
 }
 
 // MakeIterator creates the new map iterator based on channel
+// TODO: concurrent map
 func (kv *PureKv) MakeIterator(req Request, res *Response) error {
 	kv.mx.Lock()
 	defer kv.mx.Unlock()
@@ -201,12 +124,13 @@ func (kv *PureKv) MakeIterator(req Request, res *Response) error {
 	if !ok {
 		return errors.New("Map cannot be found")
 	}
-	kv.Iterators[req.Bucket] = mapKeysIterator(kv.Buckets[req.Bucket])
+	kv.Iterators[req.Bucket] = kv.Buckets[req.Bucket].MapKeysIterator()
 	res.Ok = true
 	return nil
 }
 
 // Next returns the next key-value pair according to the iterator state
+// TODO: concurrent map
 func (kv *PureKv) Next(req Request, res *Response) error {
 	kv.mx.Lock()
 	if len(req.Bucket) == 0 {
