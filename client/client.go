@@ -8,6 +8,13 @@ import (
 	"time"
 )
 
+var (
+	errCantCreateNewBucket = errors.New("unable to create new bucket")
+	errCantDeleteBucket    = errors.New("unable to delete the bucket")
+	errCantDeleteKey       = errors.New("unable to delete key")
+	errCantSetKeyValuePair = errors.New("unable to set the key-value pair")
+)
+
 // Client holds client connection
 type Client struct {
 	client  *rpc.Client
@@ -73,7 +80,7 @@ func (c *Client) Create(bucketName string) error {
 	}
 	resp := c.executeWrapper(ctx, core.Create, request)
 	if resp == nil {
-		return errors.New("unable to create new bucket")
+		return errCantCreateNewBucket
 	}
 	return nil
 }
@@ -87,7 +94,7 @@ func (c *Client) Destroy(bucketName string) error {
 	}
 	resp := c.executeWrapper(ctx, core.Destroy, request)
 	if resp == nil {
-		return errors.New("unable to delete the bucket")
+		return errCantDeleteBucket
 	}
 	return nil
 }
@@ -104,7 +111,7 @@ func (c *Client) Del(bucketName, key string) error {
 	}
 	resp := c.executeWrapper(ctx, core.Del, request)
 	if resp == nil {
-		return errors.New("unable to delete key")
+		return errCantDeleteKey
 	}
 	return nil
 }
@@ -122,7 +129,7 @@ func (c *Client) Set(bucketName, key string, val []byte) error {
 	}
 	resp := c.executeWrapper(ctx, core.Set, request)
 	if resp == nil {
-		return errors.New("unable to set the key-value pair")
+		return errCantSetKeyValuePair
 	}
 	return nil
 }
@@ -139,7 +146,7 @@ func (c *Client) Get(bucketName, key string) ([]byte, error) {
 	}
 	resp := c.executeWrapper(ctx, core.Get, request)
 	if resp == nil {
-		return nil, errors.New("unable to set the key-value pair")
+		return nil, errCantSetKeyValuePair
 	}
 	return resp.Value, nil
 }
@@ -153,7 +160,7 @@ func (c *Client) MakeIterator(bucketName string) error {
 	}
 	resp := c.executeWrapper(ctx, core.MakeIter, request)
 	if resp == nil {
-		return errors.New("unable to set the key-value pair")
+		return errCantSetKeyValuePair
 	}
 	return nil
 }
@@ -167,7 +174,7 @@ func (c *Client) Next(bucketName string) (string, []byte, error) {
 	}
 	resp := c.executeWrapper(ctx, core.Next, request)
 	if resp == nil {
-		return "", nil, errors.New("unable to set the key-value pair")
+		return "", nil, errCantSetKeyValuePair
 	}
 	return resp.Key, resp.Value, nil
 }

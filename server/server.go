@@ -11,6 +11,10 @@ import (
 	"time"
 )
 
+var (
+	errPortNotSpecified = errors.New("port must be specified")
+)
+
 // Server holds config for RPC server
 type Server struct {
 	Port               int
@@ -33,7 +37,7 @@ func InitServer(port, persistanceTimeout int, dbPath string) *Server {
 		PersistanceTimeout: persistanceTimeout,
 		DbPath:             dbPath,
 	}
-	srv.db = core.InitPureKv()
+	srv.db = core.NewPureKv()
 	return srv
 }
 
@@ -60,19 +64,19 @@ func (s *Server) Persist() {
 }
 
 // StartRPC starts a new listener and registers the RPC server
-func (s *Server) StartRPC() (err error) {
+func (s *Server) StartRPC() error {
 	if s.Port <= 0 {
-		err = errors.New("port must be specified")
-		return
+		return errPortNotSpecified
 	}
 	rpc.Register(s.db)
+	var err error
 	s.listener, err = net.Listen("tcp", ":"+strconv.Itoa(s.Port))
 	if err != nil {
-		return
+		return err
 	}
 	log.Println("Server started")
 	rpc.Accept(s.listener)
-	return
+	return nil
 }
 
 // Run loads db and creates the new RPC server

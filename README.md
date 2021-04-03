@@ -9,7 +9,7 @@ Has the following properties:
  * Stores byte arrays only.  
  * Persistant.  
  * Uses concurrency-effective maps.  
- * Supports iteration over maps ("buckets").  
+ * Supports iteration over maps.  
  * No third-party libraries has been used.  
 
 ### API  
@@ -21,7 +21,7 @@ Has the following properties:
  - `DESTROY`: async. delete the specified map;  
 
 ### TODO  
- - implement more concurrent-effective map, like adding the sharding as it has been done [here](https://github.com/orcaman/concurrent-map);  
  - unit tests;  
- - benchmarks, including concurrency;  
+ - benchmarks;  
+ - tests for race detection;  
  - github actions and badges;  

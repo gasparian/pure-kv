@@ -9,102 +9,132 @@ import (
 	"sync"
 )
 
+var (
+	errBucketKeyMustBeDefined = errors.New("Bucket key must be defined")
+	errBucketCantBeFound      = errors.New("Bucket can't be found")
+	errKeyCantBeFound         = errors.New("Key can't be found")
+)
+
+type mapIterators struct {
+	sync.RWMutex
+	Items map[string]chan string
+}
+
+type bucketsMap struct {
+	sync.RWMutex
+	Items map[string]BucketInstance
+}
+
 // PureKv main structure for holding maps and key iterators
 type PureKv struct {
-	mx        *sync.RWMutex
-	Iterators map[string]chan string
-	Buckets   map[string]BucketInstance
+	sync.Mutex
+	Iterators *mapIterators
+	Buckets   *bucketsMap
 }
 
-// InitPureKv creates PureKv instance with initialized mutex
-func InitPureKv() *PureKv {
+// NewPureKv instantiates the new PureKv object
+func NewPureKv() *PureKv {
 	return &PureKv{
-		mx: new(sync.RWMutex),
+		Iterators: &mapIterators{Items: make(map[string]chan string)},
+		Buckets:   &bucketsMap{Items: make(map[string]BucketInstance)},
 	}
 }
 
-// Create instantiates a new map
+// Create instantiates the new map
 func (kv *PureKv) Create(req Request, res *Response) error {
-	kv.mx.Lock()
-	defer kv.mx.Unlock()
+	kv.Lock()
 	if len(req.Bucket) == 0 {
-		return errors.New("Map key must be defined")
+		kv.Unlock()
+		return errBucketKeyMustBeDefined
 	}
-	kv.Buckets[req.Bucket] = make(BucketInstance) // TODO: concurrent map
+	buckets := kv.Buckets
+	kv.Unlock()
+	buckets.Lock()
+	buckets.Items[req.Bucket] = NewBucket()
+	buckets.Unlock()
 	return nil
 }
 
 // Destroy drops the entire map by key
 func (kv *PureKv) Destroy(req Request, res *Response) error {
-	kv.mx.Lock()
+	kv.Lock()
 	if len(req.Bucket) == 0 {
-		kv.mx.Unlock()
-		return errors.New("Map key must be defined")
+		kv.Unlock()
+		return errBucketKeyMustBeDefined
 	}
+	buckets := kv.Buckets
+	iterators := kv.Iterators
+	kv.Unlock()
 	go func() {
-		delete(kv.Buckets, req.Bucket)
-		delete(kv.Iterators, req.Bucket)
-		kv.mx.Unlock()
+		buckets.Lock()
+		delete(buckets.Items, req.Bucket)
+		buckets.Unlock()
+		iterators.Lock()
+		delete(iterators.Items, req.Bucket)
+		iterators.Unlock()
 	}()
 	res.Ok = true
 	return nil
 }
 
 // Del drops any record from map by keys
-// TODO: concurrent map
 func (kv *PureKv) Del(req Request, res *Response) error {
-	kv.mx.Lock()
+	kv.Lock()
 	if len(req.Bucket) == 0 {
-		kv.mx.Unlock()
-		return errors.New("Map key must be defined")
+		kv.Unlock()
+		return errBucketKeyMustBeDefined
 	}
-	_, ok := kv.Buckets[req.Bucket]
+	buckets := kv.Buckets
+	kv.Unlock()
+	buckets.RLock()
+	bucket, ok := buckets.Items[req.Bucket]
+	buckets.RUnlock()
 	if !ok {
-		kv.mx.Unlock()
-		return nil
+		return errBucketCantBeFound
 	}
 	go func() {
-		delete(kv.Buckets[req.Bucket], req.Key)
-		kv.mx.Unlock()
+		bucket.Del(req.Key)
 	}()
 	res.Ok = true
 	return nil
 }
 
 // Set just creates the new key value pair
-// TODO: concurrent map
 func (kv *PureKv) Set(req Request, res *Response) error {
-	kv.mx.Lock()
-	defer kv.mx.Unlock()
+	kv.Lock()
 	if len(req.Bucket) == 0 {
-		return errors.New("Map key must be defined")
+		kv.Unlock()
+		return errBucketKeyMustBeDefined
 	}
-	if len(req.Value) > 0 {
-		_, ok := kv.Buckets[req.Bucket]
-		if !ok {
-			return errors.New("Map cannot be found")
-		}
-		kv.Buckets[req.Bucket][req.Key] = req.Value
-		res.Ok = true
-	} else {
-		return errors.New("Both key and value must be defined")
+	buckets := kv.Buckets
+	kv.Unlock()
+	buckets.RLock()
+	bucket, ok := buckets.Items[req.Bucket]
+	buckets.RUnlock()
+	if !ok {
+		return errBucketCantBeFound
 	}
+	bucket.Set(req.Key, req.Value)
+	res.Ok = true
 	return nil
 }
 
 // Get returns value by key from one of the maps
-// TODO: concurrent map
 func (kv *PureKv) Get(req Request, res *Response) error {
-	kv.mx.RLock()
-	defer kv.mx.RUnlock()
+	kv.Lock()
 	if len(req.Bucket) == 0 {
-		return errors.New("Map key must be defined")
+		kv.Unlock()
+		return errBucketKeyMustBeDefined
 	}
-	_, ok := kv.Buckets[req.Bucket]
+	buckets := kv.Buckets
+	kv.Unlock()
+	buckets.RLock()
+	bucket, ok := buckets.Items[req.Bucket]
+	buckets.RUnlock()
 	if !ok {
-		return nil
+		return errBucketCantBeFound
 	}
-	val, ok := kv.Buckets[req.Bucket][req.Key]
+	val, ok := bucket.Get(req.Key)
 	if ok {
 		res.Value = val
 		res.Ok = true
@@ -113,97 +143,114 @@ func (kv *PureKv) Get(req Request, res *Response) error {
 }
 
 // MakeIterator creates the new map iterator based on channel
-// TODO: concurrent map
 func (kv *PureKv) MakeIterator(req Request, res *Response) error {
-	kv.mx.Lock()
-	defer kv.mx.Unlock()
+	kv.Lock()
 	if len(req.Bucket) == 0 {
-		return errors.New("Map key must be defined")
+		kv.Unlock()
+		return errBucketKeyMustBeDefined
 	}
-	_, ok := kv.Buckets[req.Bucket]
+	buckets := kv.Buckets
+	iterators := kv.Iterators
+	kv.Unlock()
+	buckets.RLock()
+	bucket, ok := buckets.Items[req.Bucket]
+	buckets.RUnlock()
 	if !ok {
-		return errors.New("Map cannot be found")
+		return errBucketCantBeFound
 	}
-	kv.Iterators[req.Bucket] = kv.Buckets[req.Bucket].MapKeysIterator()
+	iterators.Lock()
+	iterators.Items[req.Bucket] = bucket.MapKeysIterator()
+	iterators.Unlock()
 	res.Ok = true
 	return nil
 }
 
 // Next returns the next key-value pair according to the iterator state
-// TODO: concurrent map
 func (kv *PureKv) Next(req Request, res *Response) error {
-	kv.mx.Lock()
+	kv.Lock()
 	if len(req.Bucket) == 0 {
-		kv.mx.Unlock()
-		return errors.New("Map key must be defined")
+		kv.Unlock()
+		return errBucketKeyMustBeDefined
 	}
-	_, ok := kv.Buckets[req.Bucket]
+	buckets := kv.Buckets
+	iterators := kv.Iterators
+	kv.Unlock()
+	buckets.RLock()
+	bucket, ok := buckets.Items[req.Bucket]
+	buckets.RUnlock()
 	if !ok {
-		kv.mx.Unlock()
-		return errors.New("Map cannot be found")
+		return errBucketCantBeFound
 	}
-	_, ok = kv.Iterators[req.Bucket]
-	if ok {
-		key, ok := <-kv.Iterators[req.Bucket]
-		if !ok {
-			go func() {
-				delete(kv.Iterators, req.Bucket)
-				kv.mx.Unlock()
-			}()
-			return nil
-		}
-		res.Key = key
-		res.Value = kv.Buckets[req.Bucket][key]
-		res.Ok = true
+	iterators.Lock()
+	key, ok := <-iterators.Items[req.Bucket]
+	if !ok {
+		go func() {
+			delete(iterators.Items, req.Bucket)
+			iterators.Unlock()
+		}()
+		return nil
 	}
-	kv.mx.Unlock()
+	iterators.Unlock()
+	res.Key = key
+	res.Value, ok = bucket.Get(key)
+	if !ok {
+		return errKeyCantBeFound
+	}
+	res.Ok = true
 	return nil
 }
 
 // DumpDb serilizes buckets and write to disk in parallel
 func DumpDb(kv *PureKv, path string) {
-	kv.mx.RLock()
-	defer kv.mx.RUnlock()
-
 	stored, err := getDirFilesSet(path)
 	if err != nil {
 		log.Panicln(err)
 	}
-	for k, v := range kv.Buckets {
+	kv.Lock()
+	buckets := kv.Buckets
+	kv.Unlock()
+	buckets.Lock()
+	defer buckets.Unlock()
+	for k, v := range buckets.Items {
 		go func(bucketName string, bucket BucketInstance) {
 			err := bucket.SaveBucket(filepath.Join(path, bucketName))
 			if err != nil {
+				buckets.Unlock()
 				log.Panicln(err)
 			}
 		}(k, v)
 	}
-	filesToDrop := fnamesSetsDifference(stored, kv.Buckets)
-	for _, fname := range filesToDrop {
-		fpath := filepath.Join(path, fname)
-		os.Remove(fpath)
-	}
+	filesToDrop := fnamesSetsDifference(stored, buckets.Items)
+	go func() {
+		for _, fname := range filesToDrop {
+			fpath := filepath.Join(path, fname)
+			os.Remove(fpath)
+		}
+	}()
 }
 
 // LoadDb loads buckets from disk by given dir. path
 func LoadDb(kv *PureKv, path string) {
-	kv.mx.Lock()
-	defer kv.mx.Unlock()
-
 	os.MkdirAll(path, FileMode)
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
 		log.Panicln(err)
 	}
+	kv.Lock()
+	buckets := kv.Buckets
+	kv.Unlock()
+	buckets.Lock()
+	defer buckets.Unlock()
 	for _, file := range files {
 		if !file.IsDir() {
 			go func() {
 				fname := file.Name()
-				tempBucket := make(BucketInstance)
+				tempBucket := NewBucket()
 				err = tempBucket.LoadBucket(filepath.Join(path, fname))
 				if err != nil {
 					log.Panicln(err)
 				}
-				kv.Buckets[fname] = tempBucket
+				buckets.Items[fname] = tempBucket
 			}()
 		}
 	}
