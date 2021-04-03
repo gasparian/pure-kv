@@ -78,16 +78,39 @@ func (b BucketInstance) Del(key string) {
 
 // MapKeysIterator creates a channel which holds keys of the map
 func (b BucketInstance) MapKeysIterator() chan string {
-	c := make(chan string)
+	ch := make(chan string)
 	go func() {
+		wg := sync.WaitGroup{}
+		wg.Add(SHARDS_NUMBER)
 		for _, shard := range b {
-			for k := range shard.Items {
-				c <- k
-			}
-			close(c)
+			go func(sh *ConcurrentMap) {
+				sh.mutex.RLock()
+				for k := range sh.Items {
+					ch <- k
+				}
+				sh.mutex.RUnlock()
+				wg.Done()
+			}(shard)
 		}
+		wg.Wait()
+		close(ch)
 	}()
-	return c
+	var keys []string
+	for {
+		k, ok := <-ch
+		if !ok {
+			break
+		}
+		keys = append(keys, k)
+	}
+	outCh := make(chan string)
+	go func() {
+		for _, k := range keys {
+			outCh <- k
+		}
+		close(outCh)
+	}()
+	return outCh
 }
 
 // SerializeBucket encodes bucket as the byte array
