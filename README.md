@@ -5,12 +5,12 @@ Simple and fast in-memory key-value storage with RPC interface, written in go.
 
 ## Reference  
 Has the following properties:  
- * uses RPC interface.  
- * Stores byte arrays only.  
- * Persistant.  
- * Uses concurrency-effective maps.  
- * Supports iteration over maps.  
- * No third-party libraries has been used.  
+ * uses RPC interface;  
+ * stores byte arrays only;  
+ * persistant;  
+ * uses concurrency-effective maps;  
+ * supports iteration over maps;  
+ * no third-party libraries has been used;  
 
 ### API  
  - `CREATE`: creates the new map with specified key-value pair type;  
