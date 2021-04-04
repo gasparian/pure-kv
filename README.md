@@ -19,12 +19,19 @@ import (
 )
 
 cli, _ := client.InitPureKvClient("0.0.0.0:8001", uint(30))
-cli.Create("BucketName") // creates the new bucket with specified key-value pair type
-cli.Set("BucketName", "someKey", []byte{"a"}) // creates new key-value pair in the specified bucket
-val, _ := cli.Get("BucketName", "someKey") // returns decoded value
-k, val, _ := cli.Next("BucketName") // get next element of bucket
-cli.Del("BucketName", "someKey") // async. delete value from the bucket
-cli.Destroy("BucketName") // async. delete the specified bucket
+// creates the new bucket with specified key-value pair type
+cli.Create("BucketName") 
+// creates new key-value pair in the specified bucket
+cli.Set("BucketName", "someKey", []byte{"a"}) 
+// returns decoded value
+val, _ := cli.Get("BucketName", "someKey") 
+// get next element of bucket
+k, val, _ := cli.Next("BucketName") 
+// async. delete value from the bucket
+cli.Del("BucketName", "someKey") 
+// async. delete the specified bucket
+cli.Destroy("BucketName") 
+
 cli.Close() 
 ```  
 
