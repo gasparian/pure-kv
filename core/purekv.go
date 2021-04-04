@@ -2,10 +2,6 @@ package core
 
 import (
 	"errors"
-	"io/ioutil"
-	"log"
-	"os"
-	"path/filepath"
 	"sync"
 )
 
@@ -178,85 +174,4 @@ func (kv *PureKv) Next(req Request, res *Response) error {
 	}
 	res.Ok = true
 	return nil
-}
-
-// DumpDb serilizes buckets and write to disk in parallel
-func DumpDb(kv *PureKv, path string) {
-	stored, err := getDirFilesSet(path)
-	if err != nil {
-		log.Panicln(err)
-	}
-	buckets := kv.Buckets
-	buckets.Lock()
-	defer buckets.Unlock()
-	for k, v := range buckets.Items {
-		go func(bucketName string, bucket BucketInstance) {
-			err := bucket.SaveBucket(filepath.Join(path, bucketName))
-			if err != nil {
-				buckets.Unlock()
-				log.Panicln(err)
-			}
-		}(k, v)
-	}
-	filesToDrop := fnamesSetsDifference(stored, buckets.Items)
-	go func() {
-		for _, fname := range filesToDrop {
-			fpath := filepath.Join(path, fname)
-			os.Remove(fpath)
-		}
-	}()
-}
-
-// LoadDb loads buckets from disk by given dir. path
-func LoadDb(kv *PureKv, path string) {
-	os.MkdirAll(path, FileMode)
-	files, err := ioutil.ReadDir(path)
-	if err != nil {
-		log.Panicln(err)
-	}
-	buckets := kv.Buckets
-	buckets.Lock()
-	defer buckets.Unlock()
-	for _, file := range files {
-		if !file.IsDir() {
-			go func() {
-				fname := file.Name()
-				tempBucket := NewBucket()
-				err = tempBucket.LoadBucket(filepath.Join(path, fname))
-				if err != nil {
-					log.Panicln(err)
-				}
-				buckets.Items[fname] = tempBucket
-			}()
-		}
-	}
-}
-
-func getDirFilesSet(path string) (map[string]bool, error) {
-	files, err := ioutil.ReadDir(path)
-	if err != nil {
-		return nil, err
-	}
-	result := make(map[string]bool)
-	for _, file := range files {
-		if !file.IsDir() {
-			result[file.Name()] = true
-		}
-	}
-	return result, nil
-}
-
-func fnamesSetsDifference(filesSet map[string]bool, buckets map[string]BucketInstance) []string {
-	var diff []string
-	for k := range filesSet {
-		if _, ok := buckets[k]; !ok {
-			diff = append(diff, k)
-		}
-	}
-	for k := range buckets {
-		if _, ok := filesSet[k]; !ok {
-			diff = append(diff, k)
-		}
-	}
-	return diff
 }

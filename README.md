@@ -21,8 +21,11 @@ Has the following properties:
  - `DESTROY`: async. delete the specified map;  
 
 ### TODO  
- - implement consistent hashing sharding for the struct that stores buckets;  
+ - store buckets inside concurrent map structure:  
+     - save/load shards instead of buckets;  
+     - generate random names for each saved item and remove them before each dump;  
  - unit tests;  
+ - update readme with the usage examples;  
  - benchmarks;  
  - tests for race detection;  
  - github actions and badges;  
