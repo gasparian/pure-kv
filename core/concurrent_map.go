@@ -4,20 +4,14 @@ package core
 import (
 	"bytes"
 	"encoding/gob"
-	"encoding/hex"
 	"errors"
 	"hash/fnv"
 	"io"
-	"io/ioutil"
-	"math/rand"
 	"os"
 	"path/filepath"
-	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 )
 
 var (
@@ -41,9 +35,6 @@ type MapShard struct {
 
 // Serialize encodes shard as a byte array
 func (s MapShard) Serialize() ([]byte, error) {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
 	buf := &bytes.Buffer{}
 	enc := gob.NewEncoder(buf)
 	err := enc.Encode(s)
@@ -55,9 +46,6 @@ func (s MapShard) Serialize() ([]byte, error) {
 
 // Deserialize converts byte array to shard
 func (s *MapShard) Deserialize(inp []byte) error {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
 	buf := &bytes.Buffer{}
 	buf.Write(inp)
 	dec := gob.NewDecoder(buf)
@@ -222,34 +210,30 @@ func (m ConcurrentMap) MapKeysIterator(bucketName string) chan string {
 		wg.Wait()
 		close(ch)
 	}()
-	var keys []string
-	for {
-		k, ok := <-ch
-		if !ok {
-			break
-		}
-		keys = append(keys, k)
-	}
-	outCh := make(chan string)
-	go func() {
-		for _, k := range keys {
-			outCh <- k
-		}
-		close(outCh)
-	}()
-	return outCh
+	return ch
 }
 
-func generateName(length int) string {
-	rand.Seed(time.Now().UTC().UnixNano())
-	b := make([]byte, length)
-	if _, err := rand.Read(b); err != nil {
-		return ""
+type shardProcessor func(int, *MapShard, *sync.WaitGroup, chan error)
+
+func (m ConcurrentMap) iterShard(fn shardProcessor) error {
+	errs := make(chan error, SHARDS_NUMBER)
+	wg := sync.WaitGroup{}
+	wg.Add(SHARDS_NUMBER)
+	for i, shard := range m {
+		go fn(i, shard, &wg, errs)
 	}
-	return hex.EncodeToString(b)
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-// Dump asynchronously serilizes buckets and write them to disk
+// Dump serilizes buckets and writes them to disk in parallel
 func (m ConcurrentMap) Dump(path string) error {
 	err := os.RemoveAll(path)
 	if err != nil {
@@ -259,56 +243,34 @@ func (m ConcurrentMap) Dump(path string) error {
 	if err != nil {
 		return err
 	}
-	for i, shard := range m {
-		go func(idx int, sh *MapShard) {
-			shardName := mergeTwoStrings(
-				strconv.Itoa(idx),
-				generateName(20),
-				"_",
-			)
-			sh.Save(filepath.Join(path, shardName))
-		}(i, shard)
+	err = m.iterShard(
+		func(idx int, sh *MapShard, wg *sync.WaitGroup, errs chan error) {
+			sh.RLock()
+			errs <- sh.Save(filepath.Join(path, strconv.Itoa(idx)))
+			sh.RUnlock()
+			wg.Done()
+		},
+	)
+	if err != nil {
+		return err
 	}
 	return nil
 }
 
-// Load loads buckets from disk by given dir. path
-func (m *ConcurrentMap) Load(path string) error {
+// Load loads buckets from disk in parallel
+func (m ConcurrentMap) Load(path string) error {
 	os.MkdirAll(path, FileMode)
-	files, err := ioutil.ReadDir(path)
+	err := m.iterShard(
+		func(idx int, sh *MapShard, wg *sync.WaitGroup, errs chan error) {
+			sh.Lock()
+			sh.Items = make(map[string]records)
+			errs <- sh.Load(filepath.Join(path, strconv.Itoa(idx)))
+			sh.Unlock()
+			wg.Done()
+		},
+	)
 	if err != nil {
 		return err
 	}
-	var nameSplitter = regexp.MustCompile(`_`)
-	var fnames map[int]string
-	var idxsSlice []int
-	for _, file := range files {
-		if !file.IsDir() {
-			splitted := nameSplitter.Split(file.Name(), 2)
-			if len(splitted) <= 1 {
-				return errWrongFnameFormat
-			}
-			idx := strconv.Atoi(splitted[0])
-			idxsSlice = append(idxsSlice, idx)
-			fnames[idx] = file.Name()
-		}
-	}
-	if len(m) != len(fnames) {
-		return errMapAndFilesLengthNotEqual
-	}
-	sort.Ints(idxsSlice)
-	wg := sync.WaitGroup{}
-	wg.Add(SHARDS_NUMBER)
-	for _, i := range idxsSlice {
-		go func(idx int) {
-			shard := m[idx]
-			shard.Lock()
-			shard.Items = make(map[string]records)
-			shard.Load(filepath.Join(path, fnames[idx]))
-			shard.Unlock()
-			wg.Done()
-		}(i)
-	}
-	wg.Wait()
 	return nil
 }

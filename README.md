@@ -22,8 +22,7 @@ Has the following properties:
 
 ### TODO  
  - store buckets inside concurrent map structure:  
-     - save/load shards instead of buckets;  
-     - generate random names for each saved item and remove them before each dump;  
+     - add modifications into `PureKv` and `server` code;  
  - unit tests;  
  - update readme with the usage examples;  
  - benchmarks;  
