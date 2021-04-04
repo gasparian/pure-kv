@@ -51,14 +51,17 @@ func (s *Server) Close() error {
 }
 
 // LoadDb loads db using specified path
-func (s *Server) LoadDb() {
-	core.LoadDb(s.db, s.DbPath)
+func (s *Server) LoadDb() error {
+	return s.db.Buckets.Load(s.DbPath)
 }
 
 // Persist dumps db on disk periodically
 func (s *Server) Persist() {
 	for {
-		core.DumpDb(s.db, s.DbPath)
+		err := s.db.Buckets.Dump(s.DbPath)
+		if err != nil {
+			log.Panicln(err)
+		}
 		time.Sleep(time.Duration(s.PersistanceTimeout) * time.Second)
 	}
 }

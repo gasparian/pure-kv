@@ -16,22 +16,17 @@ type mapIterators struct {
 	Items map[string]chan string
 }
 
-type bucketsMap struct {
-	sync.RWMutex
-	Items map[string]BucketInstance
-}
-
 // PureKv main structure for holding maps and key iterators
 type PureKv struct {
 	Iterators *mapIterators
-	Buckets   *bucketsMap
+	Buckets   ConcurrentMap
 }
 
 // NewPureKv instantiates the new PureKv object
 func NewPureKv() *PureKv {
 	return &PureKv{
 		Iterators: &mapIterators{Items: make(map[string]chan string)},
-		Buckets:   &bucketsMap{Items: make(map[string]BucketInstance)},
+		Buckets:   NewMap(),
 	}
 }
 
@@ -41,13 +36,11 @@ func (kv *PureKv) Create(req Request, res *Response) error {
 		return errBucketKeyMustBeDefined
 	}
 	buckets := kv.Buckets
-	buckets.Lock()
-	buckets.Items[req.Bucket] = NewBucket()
-	buckets.Unlock()
+	buckets.SetBucket(req.Bucket)
 	return nil
 }
 
-// Destroy drops the entire map by key
+// Destroy drops the entire bucket
 func (kv *PureKv) Destroy(req Request, res *Response) error {
 	if len(req.Bucket) == 0 {
 		return errBucketKeyMustBeDefined
@@ -55,9 +48,7 @@ func (kv *PureKv) Destroy(req Request, res *Response) error {
 	buckets := kv.Buckets
 	iterators := kv.Iterators
 	go func() {
-		buckets.Lock()
-		delete(buckets.Items, req.Bucket)
-		buckets.Unlock()
+		buckets.DelBucket(req.Bucket)
 	}()
 	go func() {
 		iterators.Lock()
@@ -74,14 +65,8 @@ func (kv *PureKv) Del(req Request, res *Response) error {
 		return errBucketKeyMustBeDefined
 	}
 	buckets := kv.Buckets
-	buckets.RLock()
-	bucket, ok := buckets.Items[req.Bucket]
-	buckets.RUnlock()
-	if !ok {
-		return errBucketCantBeFound
-	}
 	go func() {
-		bucket.Del(req.Key)
+		buckets.Del(req.Bucket, req.Key)
 	}()
 	res.Ok = true
 	return nil
@@ -93,13 +78,7 @@ func (kv *PureKv) Set(req Request, res *Response) error {
 		return errBucketKeyMustBeDefined
 	}
 	buckets := kv.Buckets
-	buckets.RLock()
-	bucket, ok := buckets.Items[req.Bucket]
-	buckets.RUnlock()
-	if !ok {
-		return errBucketCantBeFound
-	}
-	bucket.Set(req.Key, req.Value)
+	buckets.Set(req.Bucket, req.Key, req.Value)
 	res.Ok = true
 	return nil
 }
@@ -110,17 +89,12 @@ func (kv *PureKv) Get(req Request, res *Response) error {
 		return errBucketKeyMustBeDefined
 	}
 	buckets := kv.Buckets
-	buckets.RLock()
-	bucket, ok := buckets.Items[req.Bucket]
-	buckets.RUnlock()
+	val, ok := buckets.Get(req.Bucket, req.Key)
 	if !ok {
 		return errBucketCantBeFound
 	}
-	val, ok := bucket.Get(req.Key)
-	if ok {
-		res.Value = val
-		res.Ok = true
-	}
+	res.Value = val
+	res.Ok = true
 	return nil
 }
 
@@ -130,15 +104,13 @@ func (kv *PureKv) MakeIterator(req Request, res *Response) error {
 		return errBucketKeyMustBeDefined
 	}
 	buckets := kv.Buckets
-	iterators := kv.Iterators
-	buckets.RLock()
-	bucket, ok := buckets.Items[req.Bucket]
-	buckets.RUnlock()
-	if !ok {
+	has := buckets.HasBucket(req.Bucket)
+	if !has {
 		return errBucketCantBeFound
 	}
+	iterators := kv.Iterators
 	iterators.Lock()
-	iterators.Items[req.Bucket] = bucket.MapKeysIterator()
+	iterators.Items[req.Bucket] = buckets.MapKeysIterator(req.Bucket)
 	iterators.Unlock()
 	res.Ok = true
 	return nil
@@ -151,15 +123,13 @@ func (kv *PureKv) Next(req Request, res *Response) error {
 	}
 	buckets := kv.Buckets
 	iterators := kv.Iterators
-	buckets.RLock()
-	bucket, ok := buckets.Items[req.Bucket]
-	buckets.RUnlock()
-	if !ok {
+	has := buckets.HasBucket(req.Bucket)
+	if !has {
 		return errBucketCantBeFound
 	}
 	iterators.Lock()
-	key, ok := <-iterators.Items[req.Bucket]
-	if !ok {
+	key, open := <-iterators.Items[req.Bucket]
+	if !open {
 		go func() {
 			delete(iterators.Items, req.Bucket)
 			iterators.Unlock()
@@ -168,7 +138,8 @@ func (kv *PureKv) Next(req Request, res *Response) error {
 	}
 	iterators.Unlock()
 	res.Key = key
-	res.Value, ok = bucket.Get(key)
+	var ok bool
+	res.Value, ok = buckets.Get(req.Bucket, key)
 	if !ok {
 		return errKeyCantBeFound
 	}

@@ -16,11 +16,17 @@ import (
 
 var (
 	errMapAndFilesLengthNotEqual = errors.New("Bytes slice length defers from the number of shards in concurrent map")
-	errWrongFnameFormat          = errors.New("Fname must be started from int idx separated with `_`")
+	shardsNumber                 = getShardsNumber()
 )
 
-// SHARDS_NUMBER just holds the constant for number of shards in the concurrent map
-const SHARDS_NUMBER = 32
+// shardsNumber just holds the constant for number of shards in the concurrent map
+func getShardsNumber() int {
+	shardsNumber, err := strconv.Atoi(os.Getenv("SHARDS_NUMBER"))
+	if err != nil {
+		return 32 // default value
+	}
+	return shardsNumber
+}
 
 // ConcurrentMap holds a slice of maps' pointers
 type ConcurrentMap []*MapShard
@@ -98,8 +104,8 @@ func (s *MapShard) Load(path string) error {
 
 // NewMap creates new ConcurrentMap and fills it with empty ConcurrentMaps
 func NewMap() ConcurrentMap {
-	m := make(ConcurrentMap, SHARDS_NUMBER)
-	for i := 0; i < SHARDS_NUMBER; i++ {
+	m := make(ConcurrentMap, shardsNumber)
+	for i := 0; i < shardsNumber; i++ {
 		m[i] = &MapShard{Items: make(map[string]records)}
 	}
 	return m
@@ -120,15 +126,35 @@ func mergeTwoStrings(s1, s2, delim string) string {
 }
 
 // GetShard gets MapShard by compound key
-func (m ConcurrentMap) GetShard(bucketName, key string) *MapShard {
-	sb := mergeTwoStrings(bucketName, key, "_")
-	hsh := uint(fnv32(sb))
-	return m[hsh%uint(SHARDS_NUMBER)]
+func (m ConcurrentMap) GetShard(key string) *MapShard {
+	hsh := uint(fnv32(key))
+	return m[hsh%uint(shardsNumber)]
+}
+
+// SetBucket creates new bucket in all shards
+func (m ConcurrentMap) SetBucket(bucketName string) {
+	for _, shard := range m {
+		shard.mutex.Lock()
+		shard.Items[bucketName] = make(records)
+		shard.mutex.Unlock()
+	}
+}
+
+// Set places value in the needed shard by string key
+func (m ConcurrentMap) Set(bucketName, key string, value []byte) {
+	shard := m.GetShard(key)
+	shard.mutex.Lock()
+	bucket, ok := shard.Items[bucketName]
+	if !ok {
+		return
+	}
+	bucket[key] = value
+	shard.mutex.Unlock()
 }
 
 // Get returns value by string key
 func (m ConcurrentMap) Get(bucketName, key string) ([]byte, bool) {
-	shard := m.GetShard(bucketName, key)
+	shard := m.GetShard(key)
 	shard.mutex.RLock()
 	bucket, ok := shard.Items[bucketName]
 	if !ok {
@@ -139,21 +165,22 @@ func (m ConcurrentMap) Get(bucketName, key string) ([]byte, bool) {
 	return val, ok
 }
 
-// Set places value in the needed shard by string key
-func (m ConcurrentMap) Set(bucketName, key string, value []byte) {
-	shard := m.GetShard(bucketName, key)
-	shard.mutex.Lock()
-	bucket, ok := shard.Items[bucketName]
-	if !ok {
-		return
+// HasBucket checks that key exists in the map
+func (m ConcurrentMap) HasBucket(bucketName string) bool {
+	for _, shard := range m {
+		shard.mutex.RLock()
+		_, ok := shard.Items[bucketName]
+		shard.mutex.RUnlock()
+		if ok {
+			return ok
+		}
 	}
-	bucket[key] = value
-	shard.mutex.Unlock()
+	return false
 }
 
 // Has checks that key exists in the map
 func (m ConcurrentMap) Has(bucketName, key string) bool {
-	shard := m.GetShard(bucketName, key)
+	shard := m.GetShard(key)
 	shard.mutex.RLock()
 	bucket, ok := shard.Items[bucketName]
 	if !ok {
@@ -166,7 +193,7 @@ func (m ConcurrentMap) Has(bucketName, key string) bool {
 
 // Del drops value from map by key
 func (m ConcurrentMap) Del(bucketName, key string) {
-	shard := m.GetShard(bucketName, key)
+	shard := m.GetShard(key)
 	shard.mutex.Lock()
 	bucket, ok := shard.Items[bucketName]
 	if !ok {
@@ -193,7 +220,7 @@ func (m ConcurrentMap) MapKeysIterator(bucketName string) chan string {
 	ch := make(chan string)
 	go func() {
 		wg := sync.WaitGroup{}
-		wg.Add(SHARDS_NUMBER)
+		wg.Add(shardsNumber)
 		for _, shard := range m {
 			go func(sh *MapShard) {
 				sh.mutex.RLock()
@@ -216,9 +243,9 @@ func (m ConcurrentMap) MapKeysIterator(bucketName string) chan string {
 type shardProcessor func(int, *MapShard, *sync.WaitGroup, chan error)
 
 func (m ConcurrentMap) iterShard(fn shardProcessor) error {
-	errs := make(chan error, SHARDS_NUMBER)
+	errs := make(chan error, shardsNumber)
 	wg := sync.WaitGroup{}
-	wg.Add(SHARDS_NUMBER)
+	wg.Add(shardsNumber)
 	for i, shard := range m {
 		go fn(i, shard, &wg, errs)
 	}
@@ -239,15 +266,15 @@ func (m ConcurrentMap) Dump(path string) error {
 	if err != nil {
 		return err
 	}
-	err = os.MkdirAll(path)
+	err = os.MkdirAll(path, FileMode)
 	if err != nil {
 		return err
 	}
 	err = m.iterShard(
 		func(idx int, sh *MapShard, wg *sync.WaitGroup, errs chan error) {
-			sh.RLock()
+			sh.mutex.RLock()
 			errs <- sh.Save(filepath.Join(path, strconv.Itoa(idx)))
-			sh.RUnlock()
+			sh.mutex.RUnlock()
 			wg.Done()
 		},
 	)
@@ -262,10 +289,10 @@ func (m ConcurrentMap) Load(path string) error {
 	os.MkdirAll(path, FileMode)
 	err := m.iterShard(
 		func(idx int, sh *MapShard, wg *sync.WaitGroup, errs chan error) {
-			sh.Lock()
+			sh.mutex.Lock()
 			sh.Items = make(map[string]records)
 			errs <- sh.Load(filepath.Join(path, strconv.Itoa(idx)))
-			sh.Unlock()
+			sh.mutex.Unlock()
 			wg.Done()
 		},
 	)
