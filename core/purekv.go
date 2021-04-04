@@ -27,7 +27,6 @@ type bucketsMap struct {
 
 // PureKv main structure for holding maps and key iterators
 type PureKv struct {
-	sync.Mutex
 	Iterators *mapIterators
 	Buckets   *bucketsMap
 }
@@ -42,13 +41,10 @@ func NewPureKv() *PureKv {
 
 // Create instantiates the new map
 func (kv *PureKv) Create(req Request, res *Response) error {
-	kv.Lock()
 	if len(req.Bucket) == 0 {
-		kv.Unlock()
 		return errBucketKeyMustBeDefined
 	}
 	buckets := kv.Buckets
-	kv.Unlock()
 	buckets.Lock()
 	buckets.Items[req.Bucket] = NewBucket()
 	buckets.Unlock()
@@ -57,18 +53,17 @@ func (kv *PureKv) Create(req Request, res *Response) error {
 
 // Destroy drops the entire map by key
 func (kv *PureKv) Destroy(req Request, res *Response) error {
-	kv.Lock()
 	if len(req.Bucket) == 0 {
-		kv.Unlock()
 		return errBucketKeyMustBeDefined
 	}
 	buckets := kv.Buckets
 	iterators := kv.Iterators
-	kv.Unlock()
 	go func() {
 		buckets.Lock()
 		delete(buckets.Items, req.Bucket)
 		buckets.Unlock()
+	}()
+	go func() {
 		iterators.Lock()
 		delete(iterators.Items, req.Bucket)
 		iterators.Unlock()
@@ -79,13 +74,10 @@ func (kv *PureKv) Destroy(req Request, res *Response) error {
 
 // Del drops any record from map by keys
 func (kv *PureKv) Del(req Request, res *Response) error {
-	kv.Lock()
 	if len(req.Bucket) == 0 {
-		kv.Unlock()
 		return errBucketKeyMustBeDefined
 	}
 	buckets := kv.Buckets
-	kv.Unlock()
 	buckets.RLock()
 	bucket, ok := buckets.Items[req.Bucket]
 	buckets.RUnlock()
@@ -101,13 +93,10 @@ func (kv *PureKv) Del(req Request, res *Response) error {
 
 // Set just creates the new key value pair
 func (kv *PureKv) Set(req Request, res *Response) error {
-	kv.Lock()
 	if len(req.Bucket) == 0 {
-		kv.Unlock()
 		return errBucketKeyMustBeDefined
 	}
 	buckets := kv.Buckets
-	kv.Unlock()
 	buckets.RLock()
 	bucket, ok := buckets.Items[req.Bucket]
 	buckets.RUnlock()
@@ -121,13 +110,10 @@ func (kv *PureKv) Set(req Request, res *Response) error {
 
 // Get returns value by key from one of the maps
 func (kv *PureKv) Get(req Request, res *Response) error {
-	kv.Lock()
 	if len(req.Bucket) == 0 {
-		kv.Unlock()
 		return errBucketKeyMustBeDefined
 	}
 	buckets := kv.Buckets
-	kv.Unlock()
 	buckets.RLock()
 	bucket, ok := buckets.Items[req.Bucket]
 	buckets.RUnlock()
@@ -144,14 +130,11 @@ func (kv *PureKv) Get(req Request, res *Response) error {
 
 // MakeIterator creates the new map iterator based on channel
 func (kv *PureKv) MakeIterator(req Request, res *Response) error {
-	kv.Lock()
 	if len(req.Bucket) == 0 {
-		kv.Unlock()
 		return errBucketKeyMustBeDefined
 	}
 	buckets := kv.Buckets
 	iterators := kv.Iterators
-	kv.Unlock()
 	buckets.RLock()
 	bucket, ok := buckets.Items[req.Bucket]
 	buckets.RUnlock()
@@ -167,14 +150,11 @@ func (kv *PureKv) MakeIterator(req Request, res *Response) error {
 
 // Next returns the next key-value pair according to the iterator state
 func (kv *PureKv) Next(req Request, res *Response) error {
-	kv.Lock()
 	if len(req.Bucket) == 0 {
-		kv.Unlock()
 		return errBucketKeyMustBeDefined
 	}
 	buckets := kv.Buckets
 	iterators := kv.Iterators
-	kv.Unlock()
 	buckets.RLock()
 	bucket, ok := buckets.Items[req.Bucket]
 	buckets.RUnlock()
@@ -206,9 +186,7 @@ func DumpDb(kv *PureKv, path string) {
 	if err != nil {
 		log.Panicln(err)
 	}
-	kv.Lock()
 	buckets := kv.Buckets
-	kv.Unlock()
 	buckets.Lock()
 	defer buckets.Unlock()
 	for k, v := range buckets.Items {
@@ -236,9 +214,7 @@ func LoadDb(kv *PureKv, path string) {
 	if err != nil {
 		log.Panicln(err)
 	}
-	kv.Lock()
 	buckets := kv.Buckets
-	kv.Unlock()
 	buckets.Lock()
 	defer buckets.Unlock()
 	for _, file := range files {

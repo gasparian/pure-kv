@@ -21,6 +21,7 @@ Has the following properties:
  - `DESTROY`: async. delete the specified map;  
 
 ### TODO  
+ - implement consistent hashing sharding for the struct that stores buckets;  
  - unit tests;  
  - benchmarks;  
  - tests for race detection;  
