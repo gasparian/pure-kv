@@ -44,12 +44,14 @@ import (
 )
 
 func main() {
-    srv := pkv.server.InitServer(
+	flag.Parse()
+	srv := server.InitServer(
         6666, // port
         60, // persistence timeout sec.
+        32, // number of shards for concurrent map
         "/tmp/pure-kv-db", // db path
-    )
-    srv.Run()
+	)
+	srv.Run()
 }
 ```  
 
