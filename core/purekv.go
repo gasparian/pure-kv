@@ -37,6 +37,7 @@ func (kv *PureKv) Create(req Request, res *Response) error {
 	}
 	buckets := kv.Buckets
 	buckets.SetBucket(req.Bucket)
+	res.Ok = true
 	return nil
 }
 
@@ -47,14 +48,10 @@ func (kv *PureKv) Destroy(req Request, res *Response) error {
 	}
 	buckets := kv.Buckets
 	iterators := kv.Iterators
-	go func() {
-		buckets.DelBucket(req.Bucket)
-	}()
-	go func() {
-		iterators.Lock()
-		delete(iterators.Items, req.Bucket)
-		iterators.Unlock()
-	}()
+	buckets.DelBucket(req.Bucket)
+	iterators.Lock()
+	delete(iterators.Items, req.Bucket)
+	iterators.Unlock()
 	res.Ok = true
 	return nil
 }
@@ -65,9 +62,7 @@ func (kv *PureKv) Del(req Request, res *Response) error {
 		return errBucketKeyMustBeDefined
 	}
 	buckets := kv.Buckets
-	go func() {
-		buckets.Del(req.Bucket, req.Key)
-	}()
+	buckets.Del(req.Bucket, req.Key)
 	res.Ok = true
 	return nil
 }

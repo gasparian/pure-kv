@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 )
 
@@ -31,16 +30,17 @@ func getShardsNumber() int {
 // ConcurrentMap holds a slice of maps' pointers
 type ConcurrentMap []*MapShard
 
-type records map[string][]byte
+// Records is just alias for map of byte-arrays
+type Records map[string][]byte
 
 // MapShard is just as regular map but with embedded mutex
 type MapShard struct {
 	mutex sync.RWMutex
-	Items map[string]records
+	Items map[string]Records
 }
 
 // Serialize encodes shard as a byte array
-func (s MapShard) Serialize() ([]byte, error) {
+func (s *MapShard) Serialize() ([]byte, error) {
 	buf := &bytes.Buffer{}
 	enc := gob.NewEncoder(buf)
 	err := enc.Encode(s)
@@ -63,7 +63,7 @@ func (s *MapShard) Deserialize(inp []byte) error {
 }
 
 // Save dumps shard to disk
-func (s MapShard) Save(path string) error {
+func (s *MapShard) Save(path string) error {
 	f, err := os.Create(path)
 	if err != nil {
 		return err
@@ -106,7 +106,7 @@ func (s *MapShard) Load(path string) error {
 func NewMap() ConcurrentMap {
 	m := make(ConcurrentMap, shardsNumber)
 	for i := 0; i < shardsNumber; i++ {
-		m[i] = &MapShard{Items: make(map[string]records)}
+		m[i] = &MapShard{Items: make(map[string]Records)}
 	}
 	return m
 }
@@ -117,16 +117,8 @@ func fnv32(s string) uint32 {
 	return h.Sum32()
 }
 
-func mergeTwoStrings(s1, s2, delim string) string {
-	var sb strings.Builder
-	sb.WriteString(s1)
-	sb.WriteString(delim)
-	sb.WriteString(s2)
-	return sb.String()
-}
-
-// GetShard gets MapShard by compound key
-func (m ConcurrentMap) GetShard(key string) *MapShard {
+// getShard gets MapShard by compound key
+func (m ConcurrentMap) getShard(key string) *MapShard {
 	hsh := uint(fnv32(key))
 	return m[hsh%uint(shardsNumber)]
 }
@@ -135,14 +127,14 @@ func (m ConcurrentMap) GetShard(key string) *MapShard {
 func (m ConcurrentMap) SetBucket(bucketName string) {
 	for _, shard := range m {
 		shard.mutex.Lock()
-		shard.Items[bucketName] = make(records)
+		shard.Items[bucketName] = make(Records)
 		shard.mutex.Unlock()
 	}
 }
 
 // Set places value in the needed shard by string key
 func (m ConcurrentMap) Set(bucketName, key string, value []byte) {
-	shard := m.GetShard(key)
+	shard := m.getShard(key)
 	shard.mutex.Lock()
 	bucket, ok := shard.Items[bucketName]
 	if !ok {
@@ -154,7 +146,7 @@ func (m ConcurrentMap) Set(bucketName, key string, value []byte) {
 
 // Get returns value by string key
 func (m ConcurrentMap) Get(bucketName, key string) ([]byte, bool) {
-	shard := m.GetShard(key)
+	shard := m.getShard(key)
 	shard.mutex.RLock()
 	bucket, ok := shard.Items[bucketName]
 	if !ok {
@@ -167,20 +159,18 @@ func (m ConcurrentMap) Get(bucketName, key string) ([]byte, bool) {
 
 // HasBucket checks that key exists in the map
 func (m ConcurrentMap) HasBucket(bucketName string) bool {
-	for _, shard := range m {
-		shard.mutex.RLock()
-		_, ok := shard.Items[bucketName]
-		shard.mutex.RUnlock()
-		if ok {
-			return ok
-		}
+	m[0].mutex.RLock()
+	_, ok := m[0].Items[bucketName]
+	m[0].mutex.RUnlock()
+	if ok {
+		return ok
 	}
 	return false
 }
 
 // Has checks that key exists in the map
 func (m ConcurrentMap) Has(bucketName, key string) bool {
-	shard := m.GetShard(key)
+	shard := m.getShard(key)
 	shard.mutex.RLock()
 	bucket, ok := shard.Items[bucketName]
 	if !ok {
@@ -193,7 +183,7 @@ func (m ConcurrentMap) Has(bucketName, key string) bool {
 
 // Del drops value from map by key
 func (m ConcurrentMap) Del(bucketName, key string) {
-	shard := m.GetShard(key)
+	shard := m.getShard(key)
 	shard.mutex.Lock()
 	bucket, ok := shard.Items[bucketName]
 	if !ok {
@@ -205,14 +195,17 @@ func (m ConcurrentMap) Del(bucketName, key string) {
 
 // DelBucket drops bucket from every shard
 func (m ConcurrentMap) DelBucket(bucketName string) {
-	for _, shard := range m {
-		shard.mutex.Lock()
-		_, ok := shard.Items[bucketName]
-		if ok {
-			delete(shard.Items, bucketName)
-		}
-		shard.mutex.Unlock()
-	}
+	m.iterShard(
+		func(idx int, sh *MapShard, wg *sync.WaitGroup, errs chan error) {
+			sh.mutex.Lock()
+			_, ok := sh.Items[bucketName]
+			if ok {
+				delete(sh.Items, bucketName)
+			}
+			sh.mutex.Unlock()
+			wg.Done()
+		},
+	)
 }
 
 // MapKeysIterator creates a channel which holds keys of the map
@@ -290,7 +283,7 @@ func (m ConcurrentMap) Load(path string) error {
 	err := m.iterShard(
 		func(idx int, sh *MapShard, wg *sync.WaitGroup, errs chan error) {
 			sh.mutex.Lock()
-			sh.Items = make(map[string]records)
+			sh.Items = make(map[string]Records)
 			errs <- sh.Load(filepath.Join(path, strconv.Itoa(idx)))
 			sh.mutex.Unlock()
 			wg.Done()

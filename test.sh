@@ -1,2 +1,2 @@
 #!/bin/sh
-# TODO: 
+go test -v -cover ./...

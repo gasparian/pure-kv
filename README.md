@@ -23,7 +23,7 @@ cli, _ := pkv.client.InitPureKvClient("0.0.0.0:8001", uint(30))
 // creates the new bucket with specified key-value pair type
 cli.Create("BucketName") 
 // creates new key-value pair in the specified bucket
-cli.Set("BucketName", "someKey", []byte{"a"}) 
+cli.Set("BucketName", "someKey", []byte{'a'}) 
 // returns decoded value
 val, _ := cli.Get("BucketName", "someKey") 
 // get next element of bucket
