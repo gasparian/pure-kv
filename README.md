@@ -11,14 +11,15 @@ Has the following properties:
  * supports iteration over maps;  
  * no third-party libraries has been used;  
 
-### API  
+### Reference  
 
+Client:  
 ```go
 import (
-    "pure-kv-go/client"
+    pkv "pure-kv-go"
 )
 
-cli, _ := client.InitPureKvClient("0.0.0.0:8001", uint(30))
+cli, _ := pkv.client.InitPureKvClient("0.0.0.0:8001", uint(30))
 // creates the new bucket with specified key-value pair type
 cli.Create("BucketName") 
 // creates new key-value pair in the specified bucket
@@ -34,6 +35,23 @@ cli.Destroy("BucketName")
 
 cli.Close() 
 ```  
+
+[Server](https://github.com/gasparian/pure-kv-go/blob/main/main.go):  
+```go
+
+import (
+	pkv "pure-kv-go"
+)
+
+func main() {
+	srv := pkv.server.InitServer(
+		6666, // port
+		60, // persistence timeout sec.
+		"/tmp/pure-kv-db", // db path
+	)
+	srv.Run()
+}
+```
 
 ### TODO  
  - unit tests;  
