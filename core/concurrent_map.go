@@ -15,17 +15,7 @@ import (
 
 var (
 	errMapAndFilesLengthNotEqual = errors.New("Bytes slice length defers from the number of shards in concurrent map")
-	shardsNumber                 = getShardsNumber()
 )
-
-// shardsNumber just holds the constant for number of shards in the concurrent map
-func getShardsNumber() int {
-	shardsNumber, err := strconv.Atoi(os.Getenv("SHARDS_NUMBER"))
-	if err != nil {
-		return 32 // default value
-	}
-	return shardsNumber
-}
 
 // ConcurrentMap holds a slice of maps' pointers
 type ConcurrentMap []*MapShard
@@ -103,7 +93,7 @@ func (s *MapShard) Load(path string) error {
 }
 
 // NewMap creates new ConcurrentMap and fills it with empty ConcurrentMaps
-func NewMap() ConcurrentMap {
+func NewMap(shardsNumber int) ConcurrentMap {
 	m := make(ConcurrentMap, shardsNumber)
 	for i := 0; i < shardsNumber; i++ {
 		m[i] = &MapShard{Items: make(map[string]Records)}
@@ -119,17 +109,19 @@ func fnv32(s string) uint32 {
 
 // getShard gets MapShard by compound key
 func (m ConcurrentMap) getShard(key string) *MapShard {
-	hsh := uint(fnv32(key))
-	return m[hsh%uint(shardsNumber)]
+	return m[uint(fnv32(key))%uint(len(m))]
 }
 
 // SetBucket creates new bucket in all shards
 func (m ConcurrentMap) SetBucket(bucketName string) {
-	for _, shard := range m {
-		shard.mutex.Lock()
-		shard.Items[bucketName] = make(Records)
-		shard.mutex.Unlock()
-	}
+	m.iterShard(
+		func(idx int, sh *MapShard, wg *sync.WaitGroup, errs chan error) {
+			sh.mutex.Lock()
+			sh.Items[bucketName] = make(Records)
+			sh.mutex.Unlock()
+			wg.Done()
+		},
+	)
 }
 
 // Set places value in the needed shard by string key
@@ -213,7 +205,7 @@ func (m ConcurrentMap) MapKeysIterator(bucketName string) chan string {
 	ch := make(chan string)
 	go func() {
 		wg := sync.WaitGroup{}
-		wg.Add(shardsNumber)
+		wg.Add(len(m))
 		for _, shard := range m {
 			go func(sh *MapShard) {
 				sh.mutex.RLock()
@@ -236,9 +228,9 @@ func (m ConcurrentMap) MapKeysIterator(bucketName string) chan string {
 type shardProcessor func(int, *MapShard, *sync.WaitGroup, chan error)
 
 func (m ConcurrentMap) iterShard(fn shardProcessor) error {
-	errs := make(chan error, shardsNumber)
+	errs := make(chan error, len(m))
 	wg := sync.WaitGroup{}
-	wg.Add(shardsNumber)
+	wg.Add(len(m))
 	for i, shard := range m {
 		go fn(i, shard, &wg, errs)
 	}

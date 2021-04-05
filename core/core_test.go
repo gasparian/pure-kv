@@ -5,10 +5,11 @@ import (
 	"os"
 	"pure-kv-go/core"
 	"testing"
+	"time"
 )
 
 func TestBucket(t *testing.T) {
-	m := core.NewMap()
+	m := core.NewMap(32)
 	bucketName := "test"
 	m.SetBucket(bucketName)
 	ok := m.HasBucket(bucketName)
@@ -16,6 +17,7 @@ func TestBucket(t *testing.T) {
 		t.Error("Bucket `test` should exist")
 	}
 	m.DelBucket(bucketName)
+	time.Sleep(250 * time.Millisecond)
 	ok = m.HasBucket(bucketName)
 	if ok {
 		t.Error("Bucket `test` should not be exist")
@@ -23,7 +25,7 @@ func TestBucket(t *testing.T) {
 }
 
 func TestSetGet(t *testing.T) {
-	m := core.NewMap()
+	m := core.NewMap(32)
 	bucketName := "test"
 	key := "key"
 	val := []byte{'a'}
@@ -42,6 +44,7 @@ func TestSetGet(t *testing.T) {
 		t.Error("Values should be equal")
 	}
 	m.Del(bucketName, key)
+	time.Sleep(250 * time.Millisecond)
 	ok = m.Has(bucketName, key)
 	if ok {
 		t.Error("Key should not be exist")
@@ -49,7 +52,7 @@ func TestSetGet(t *testing.T) {
 }
 
 func TestIterator(t *testing.T) {
-	m := core.NewMap()
+	m := core.NewMap(32)
 	bucketName := "test"
 	records := core.Records{
 		"key1": []byte{'a'},
@@ -71,6 +74,7 @@ func TestIterator(t *testing.T) {
 		t.Error("Iterator should return two keys")
 	}
 	m.DelBucket(bucketName)
+	time.Sleep(250 * time.Millisecond)
 	ch = m.MapKeysIterator(bucketName)
 	_, ok := <-ch
 	if ok {
@@ -81,7 +85,7 @@ func TestIterator(t *testing.T) {
 func TestDumpLoad(t *testing.T) {
 	path := "/tmp/pure-kv-go"
 	defer os.RemoveAll(path)
-	m := core.NewMap()
+	m := core.NewMap(32)
 	bucketName := "test"
 	m.SetBucket(bucketName)
 	m.Set(bucketName, "key1", []byte{'a'})
@@ -89,7 +93,7 @@ func TestDumpLoad(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	m2 := core.NewMap()
+	m2 := core.NewMap(32)
 	err = m2.Load(path)
 	if err != nil {
 		t.Error(err)
@@ -101,7 +105,7 @@ func TestDumpLoad(t *testing.T) {
 }
 
 func TestPureKvBuckets(t *testing.T) {
-	pkv := core.NewPureKv()
+	pkv := core.NewPureKv(32)
 	req := core.Request{Bucket: "test"}
 	req.Key = "key"
 	resp := &core.Response{}
@@ -111,6 +115,7 @@ func TestPureKvBuckets(t *testing.T) {
 	}
 	resp = &core.Response{}
 	err = pkv.Destroy(req, resp)
+	time.Sleep(250 * time.Millisecond)
 	if !resp.Ok || err != nil {
 		t.Errorf("Bucket has not been deleted: %v", err)
 	}
@@ -122,7 +127,7 @@ func TestPureKvBuckets(t *testing.T) {
 }
 
 func TestPureKvSetGet(t *testing.T) {
-	pkv := core.NewPureKv()
+	pkv := core.NewPureKv(32)
 	req := core.Request{Bucket: "test"}
 	req.Key = "key"
 	req.Value = []byte{'a'}
@@ -142,6 +147,7 @@ func TestPureKvSetGet(t *testing.T) {
 	}
 	resp = &core.Response{}
 	err = pkv.Del(req, resp)
+	time.Sleep(250 * time.Millisecond)
 	if !resp.Ok || err != nil {
 		t.Errorf("Can't delete the value: %v", err)
 	}
@@ -153,7 +159,7 @@ func TestPureKvSetGet(t *testing.T) {
 }
 
 func TestPureKvIter(t *testing.T) {
-	pkv := core.NewPureKv()
+	pkv := core.NewPureKv(32)
 	reqs := make([]core.Request, 2)
 	reqs[0].Bucket = "test"
 	reqs[1].Bucket = "test"

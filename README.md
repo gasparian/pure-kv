@@ -40,21 +40,37 @@ cli.Close()
 ```go
 
 import (
-	pkv "pure-kv-go"
+    pkv "pure-kv-go"
 )
 
 func main() {
-	srv := pkv.server.InitServer(
-		6666, // port
-		60, // persistence timeout sec.
-		"/tmp/pure-kv-db", // db path
-	)
-	srv.Run()
+    srv := pkv.server.InitServer(
+        6666, // port
+        60, // persistence timeout sec.
+        "/tmp/pure-kv-db", // db path
+    )
+    srv.Run()
 }
+```  
+
+### Tests  
+
+Unit tests:  
 ```
+./test.sh
+```  
+
+Benchmark tests:  
+```
+./bench.sh ./core/
+```  
+
+Data race tests based on benchmark:  
+```
+./teset_race.sh ./core/
+```  
 
 ### TODO  
  - unit tests;  
  - benchmarks;  
- - tests for race detection;  
  - github actions and badges;  

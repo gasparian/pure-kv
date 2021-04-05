@@ -23,10 +23,10 @@ type PureKv struct {
 }
 
 // NewPureKv instantiates the new PureKv object
-func NewPureKv() *PureKv {
+func NewPureKv(shardsNumber int) *PureKv {
 	return &PureKv{
 		Iterators: &mapIterators{Items: make(map[string]chan string)},
-		Buckets:   NewMap(),
+		Buckets:   NewMap(shardsNumber),
 	}
 }
 
@@ -48,10 +48,14 @@ func (kv *PureKv) Destroy(req Request, res *Response) error {
 	}
 	buckets := kv.Buckets
 	iterators := kv.Iterators
-	buckets.DelBucket(req.Bucket)
-	iterators.Lock()
-	delete(iterators.Items, req.Bucket)
-	iterators.Unlock()
+	go func() {
+		buckets.DelBucket(req.Bucket)
+	}()
+	go func() {
+		iterators.Lock()
+		delete(iterators.Items, req.Bucket)
+		iterators.Unlock()
+	}()
 	res.Ok = true
 	return nil
 }
@@ -62,7 +66,9 @@ func (kv *PureKv) Del(req Request, res *Response) error {
 		return errBucketKeyMustBeDefined
 	}
 	buckets := kv.Buckets
-	buckets.Del(req.Bucket, req.Key)
+	go func() {
+		buckets.Del(req.Bucket, req.Key)
+	}()
 	res.Ok = true
 	return nil
 }

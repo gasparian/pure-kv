@@ -31,13 +31,13 @@ func (s *Server) CleanDir() {
 }
 
 // InitServer creates a new instance of Server
-func InitServer(port, persistanceTimeout int, dbPath string) *Server {
+func InitServer(port, persistanceTimeout, shards int, dbPath string) *Server {
 	srv := &Server{
 		Port:               port,
 		PersistanceTimeout: persistanceTimeout,
 		DbPath:             dbPath,
 	}
-	srv.db = core.NewPureKv()
+	srv.db = core.NewPureKv(shards)
 	return srv
 }
 
