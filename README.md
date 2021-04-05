@@ -3,7 +3,7 @@ Simple and fast in-memory key-value storage with RPC interface, written in go.
 
 <p align="center"> <img src="https://github.com/gasparian/pure-kv-go/blob/main/pics/logo.jpg" height=300/> </p>  
 
-Has the following properties:  
+Features:  
  * uses RPC interface;  
  * stores byte arrays only;  
  * persistant;  
