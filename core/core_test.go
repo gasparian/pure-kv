@@ -13,7 +13,7 @@ func TestBucket(t *testing.T) {
 	bucketName := "test"
 	m.SetBucket(bucketName)
 	ok := m.HasBucket(bucketName)
-	if ok { // !ok
+	if !ok {
 		t.Error("Bucket `test` should exist")
 	}
 	m.DelBucket(bucketName)
