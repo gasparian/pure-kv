@@ -15,14 +15,20 @@ Features:
  * persistant;  
  * doesn't depend on any third-party library;  
 
-### Reference  
+### Install  
+```
+go get github.com/gasparian/pure-kv-go
+```  
+
+### Usage  
 
 Client:  
 ```go
 import (
-    pkv "pure-kv-go"
+    pkv "github.com/gasparian/pure-kv-go"
 )
 
+// create client instance providing server address and timetout in sec. 
 cli, _ := pkv.client.InitPureKvClient("0.0.0.0:8001", uint(30))
 // creates the new bucket with specified key-value pair type
 cli.Create("BucketName") 
@@ -44,7 +50,7 @@ cli.Close()
 ```go
 
 import (
-    pkv "pure-kv-go"
+    pkv "github.com/gasparian/pure-kv-go"
 )
 
 func main() {
@@ -85,3 +91,7 @@ Benchmark will generate `trace.out`, you then need to run tool for diagnostics:
 ```
 go tool trace trace.out
 ```  
+
+### TODO:  
+ - tests for client and server;  
+ - pre-commit hook with `go fmt`;  

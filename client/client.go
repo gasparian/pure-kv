@@ -29,7 +29,7 @@ func InitPureKvClient(address string, timeout uint) (*Client, error) {
 	}
 	pureKvClient := &Client{
 		client:  c,
-		timeout: time.Duration(timeout) * time.Millisecond,
+		timeout: time.Duration(timeout) * time.Second,
 	}
 	return pureKvClient, nil
 }
