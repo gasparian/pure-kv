@@ -1,3 +1,6 @@
+![main build](https://github.com/gasparian/pure-kv-go/actions/workflows/build.yml/badge.svg?branch=main)
+![main tests](https://github.com/gasparian/pure-kv-go/actions/workflows/test.yml/badge.svg?branch=main)
+
 # pure-kv-go  
 Simple and fast in-memory key-value storage with RPC interface, written in go.  
 
@@ -5,11 +8,12 @@ Simple and fast in-memory key-value storage with RPC interface, written in go.
 
 Features:  
  * uses RPC interface;  
+ * supports buckets so you can organize your storage better;  
  * stores byte arrays only;  
- * persistant;  
  * uses concurrency-effective maps;  
  * supports iteration over maps;  
- * no third-party libraries has been used;  
+ * persistant;  
+ * doesn't depend on any third-party library;  
 
 ### Reference  
 
@@ -81,8 +85,3 @@ Benchmark will generate `trace.out`, you then need to run tool for diagnostics:
 ```
 go tool trace trace.out
 ```  
-
-### TODO  
- - unit tests;  
- - benchmarks;  
- - github actions and badges;  
