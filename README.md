@@ -64,12 +64,22 @@ Unit tests:
 
 Benchmark tests:  
 ```
-./bench.sh ./core/
+./bench.sh ./{PACKAGE}
 ```  
+Benchmark will generate cpu ans mem profiles, which could be examined with the `pprof` tool.  
 
 Data race tests based on benchmark:  
 ```
-./teset_race.sh ./core/
+./test_race.sh ./{PACKAGE}
+```  
+
+Tracing:  
+```
+./bench_trace.sh ./{PACKAGE}
+```  
+Benchmark will generate `trace.out`, you then need to run tool for diagnostics:  
+```
+go tool trace trace.out
 ```  
 
 ### TODO  
