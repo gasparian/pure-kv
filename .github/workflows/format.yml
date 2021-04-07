@@ -1,0 +1,20 @@
+on: [push, pull_request]
+name: Go format
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Install Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: '1.13.0'
+    - name: Formatting
+      run: go fmt ./...
+    - name: Commit report
+      run: |
+        git config --global user.name 'github-actions'
+        git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
+        git commit -am "Automated code formatting"
+        git push
