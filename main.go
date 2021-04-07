@@ -15,7 +15,7 @@ var (
 func main() {
 	flag.Parse()
 	srv := server.InitServer(
-	*port,
+		*port,
 		*persistanceTimeout,
 		*shards,
 		*dbPath,
