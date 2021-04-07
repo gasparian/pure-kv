@@ -1,3 +1,3 @@
-package server_test
+package server
 
 // TODO:

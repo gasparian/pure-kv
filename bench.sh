@@ -6,4 +6,4 @@ go test -v \
         -benchmem \
         -memprofile memprofile.out \
         -cpuprofile profile.out \
-        ${1}
+        ./core

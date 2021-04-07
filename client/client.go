@@ -135,7 +135,7 @@ func (c *Client) Set(bucketName, key string, val []byte) error {
 }
 
 // Get makes RPC that returns value by key from one of the buckets
-func (c *Client) Get(bucketName, key string) ([]byte, error) {
+func (c *Client) Get(bucketName, key string) ([]byte, bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 	request := &core.Request{
@@ -146,9 +146,9 @@ func (c *Client) Get(bucketName, key string) ([]byte, error) {
 	}
 	resp := c.executeWrapper(ctx, core.Get, request)
 	if resp == nil {
-		return nil, errCantSetKeyValuePair
+		return nil, false
 	}
-	return resp.Value, nil
+	return resp.Value, true
 }
 
 // MakeIterator makes RPC for creating the new map iterator based on channel

@@ -5,4 +5,4 @@ go test -v \
         -bench=. \
         -benchtime=0.05s \
         -benchmem \
-        ${1}
+        ./core

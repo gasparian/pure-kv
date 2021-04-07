@@ -1,15 +1,15 @@
-package core_test
+package core
 
 import (
 	"bytes"
 	"os"
-	"pure-kv-go/core"
 	"testing"
 	"time"
 )
 
 func TestBucket(t *testing.T) {
-	m := core.NewMap(32)
+	t.Parallel()
+	m := NewMap(32)
 	bucketName := "test"
 	m.SetBucket(bucketName)
 	ok := m.HasBucket(bucketName)
@@ -25,7 +25,8 @@ func TestBucket(t *testing.T) {
 }
 
 func TestSetGet(t *testing.T) {
-	m := core.NewMap(32)
+	t.Parallel()
+	m := NewMap(32)
 	bucketName := "test"
 	key := "key"
 	val := []byte{'a'}
@@ -52,9 +53,10 @@ func TestSetGet(t *testing.T) {
 }
 
 func TestIterator(t *testing.T) {
-	m := core.NewMap(32)
+	t.Parallel()
+	m := NewMap(32)
 	bucketName := "test"
-	records := core.Records{
+	records := Records{
 		"key1": []byte{'a'},
 		"key2": []byte{'b'},
 	}
@@ -83,9 +85,10 @@ func TestIterator(t *testing.T) {
 }
 
 func TestDumpLoad(t *testing.T) {
+	t.Parallel()
 	path := "/tmp/pure-kv-go"
 	defer os.RemoveAll(path)
-	m := core.NewMap(32)
+	m := NewMap(32)
 	bucketName := "test"
 	m.SetBucket(bucketName)
 	m.Set(bucketName, "key1", []byte{'a'})
@@ -93,7 +96,7 @@ func TestDumpLoad(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	m2 := core.NewMap(32)
+	m2 := NewMap(32)
 	err = m2.Load(path)
 	if err != nil {
 		t.Error(err)
@@ -105,21 +108,22 @@ func TestDumpLoad(t *testing.T) {
 }
 
 func TestPureKvBuckets(t *testing.T) {
-	pkv := core.NewPureKv(32)
-	req := core.Request{Bucket: "test"}
+	t.Parallel()
+	pkv := NewPureKv(32)
+	req := Request{Bucket: "test"}
 	req.Key = "key"
-	resp := &core.Response{}
+	resp := &Response{}
 	err := pkv.Create(req, resp)
 	if !resp.Ok || err != nil {
 		t.Errorf("Bucket has not been created: %v", err)
 	}
-	resp = &core.Response{}
+	resp = &Response{}
 	err = pkv.Destroy(req, resp)
 	time.Sleep(250 * time.Millisecond)
 	if !resp.Ok || err != nil {
 		t.Errorf("Bucket has not been deleted: %v", err)
 	}
-	resp = &core.Response{}
+	resp = &Response{}
 	err = pkv.MakeIterator(req, resp)
 	if !(!resp.Ok && err != nil) {
 		t.Error("Bucket is not exist, should be an error here!")
@@ -127,17 +131,18 @@ func TestPureKvBuckets(t *testing.T) {
 }
 
 func TestPureKvSetGet(t *testing.T) {
-	pkv := core.NewPureKv(32)
-	req := core.Request{Bucket: "test"}
+	t.Parallel()
+	pkv := NewPureKv(32)
+	req := Request{Bucket: "test"}
 	req.Key = "key"
 	req.Value = []byte{'a'}
-	resp := &core.Response{}
+	resp := &Response{}
 	pkv.Create(req, resp)
 	err := pkv.Set(req, resp)
 	if !resp.Ok || err != nil {
 		t.Errorf("Can't set the value: %v", err)
 	}
-	resp = &core.Response{}
+	resp = &Response{}
 	err = pkv.Get(req, resp)
 	if !resp.Ok || err != nil {
 		t.Errorf("Can't get the value: %v", err)
@@ -145,13 +150,13 @@ func TestPureKvSetGet(t *testing.T) {
 	if bytes.Compare(resp.Value, req.Value) != 0 {
 		t.Error("Value is not valid")
 	}
-	resp = &core.Response{}
+	resp = &Response{}
 	err = pkv.Del(req, resp)
 	time.Sleep(250 * time.Millisecond)
 	if !resp.Ok || err != nil {
 		t.Errorf("Can't delete the value: %v", err)
 	}
-	resp = &core.Response{}
+	resp = &Response{}
 	err = pkv.Get(req, resp)
 	if !(!resp.Ok && err != nil) {
 		t.Errorf("Error getting deleted value: %v", err)
@@ -159,32 +164,33 @@ func TestPureKvSetGet(t *testing.T) {
 }
 
 func TestPureKvIter(t *testing.T) {
-	pkv := core.NewPureKv(32)
-	reqs := make([]core.Request, 2)
+	t.Parallel()
+	pkv := NewPureKv(32)
+	reqs := make([]Request, 2)
 	reqs[0].Bucket = "test"
 	reqs[1].Bucket = "test"
 	reqs[0].Key = "key1"
 	reqs[1].Key = "key2"
 	reqs[0].Value = []byte{'a'}
 	reqs[1].Value = []byte{'b'}
-	resp := &core.Response{}
+	resp := &Response{}
 	pkv.Create(reqs[0], resp)
 	for _, req := range reqs {
 		pkv.Set(req, resp)
 	}
-	resp = &core.Response{}
+	resp = &Response{}
 	err := pkv.MakeIterator(reqs[0], resp)
 	if !resp.Ok || err != nil {
 		t.Errorf("Can't create iterator: %v", err)
 	}
 	for _, req := range reqs {
-		resp = &core.Response{}
+		resp = &Response{}
 		err = pkv.Next(req, resp)
 		if !resp.Ok || err != nil {
 			t.Errorf("Can't get next element of iterator: %v", err)
 		}
 	}
-	resp = &core.Response{}
+	resp = &Response{}
 	err = pkv.Next(reqs[0], resp)
 	if !(!resp.Ok || err != nil) {
 		t.Errorf("Iterator must be finished: %v", err)

@@ -28,22 +28,23 @@ import (
     pkv "github.com/gasparian/pure-kv-go"
 )
 
-// create client instance providing server address and timetout in sec. 
-cli, _ := pkv.client.InitPureKvClient("0.0.0.0:8001", uint(30))
+// creates client instance providing server address and timetout in sec. 
+cli, err := pkv.client.InitPureKvClient("0.0.0.0:8001", uint(30))
+defer cli.Close() 
 // creates the new bucket with specified key-value pair type
-cli.Create("BucketName") 
+err = cli.Create("BucketName") 
 // creates new key-value pair in the specified bucket
-cli.Set("BucketName", "someKey", []byte{'a'}) 
+err = cli.Set("BucketName", "someKey", []byte{'a'}) 
 // returns decoded value
-val, _ := cli.Get("BucketName", "someKey") 
+val, ok := cli.Get("BucketName", "someKey") 
+// makes new iterator for specified bucket
+err = cli.MakeIterator("BucketName")
 // get next element of bucket
-k, val, _ := cli.Next("BucketName") 
+k, val, err := cli.Next("BucketName") 
 // async. delete value from the bucket
-cli.Del("BucketName", "someKey") 
+err = cli.Del("BucketName", "someKey") 
 // async. delete the specified bucket
-cli.Destroy("BucketName") 
-
-cli.Close() 
+err = cli.Destroy("BucketName") 
 ```  
 
 [Server](https://github.com/gasparian/pure-kv-go/blob/main/main.go):  
@@ -91,7 +92,3 @@ Benchmark will generate `trace.out`, you then need to run tool for diagnostics:
 ```
 go tool trace trace.out
 ```  
-
-### TODO:  
- - tests for client and server;  
- - pre-commit hook with `go fmt`;  
