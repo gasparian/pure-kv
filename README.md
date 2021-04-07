@@ -70,23 +70,23 @@ func main() {
 
 Unit tests:  
 ```
-./test.sh
+./test.sh {PACKAGE}
 ```  
 
-Benchmark tests:  
+Benchmark tests for concurrent map:  
 ```
-./bench.sh ./{PACKAGE}
+./bench.sh
 ```  
 Benchmark will generate cpu ans mem profiles, which could be examined with the `pprof` tool.  
 
 Data race tests based on benchmark:  
 ```
-./test_race.sh ./{PACKAGE}
+./test_race.sh
 ```  
 
 Tracing:  
 ```
-./bench_trace.sh ./{PACKAGE}
+./bench_trace.sh
 ```  
 Benchmark will generate `trace.out`, you then need to run tool for diagnostics:  
 ```
