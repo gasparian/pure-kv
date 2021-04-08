@@ -17,7 +17,7 @@ const (
 
 func prepareServer(t *testing.T) func() error {
 	srv := server.InitServer(
-		6666, // port
+		6667, // port
 		2,    // persistence timeout sec.
 		32,   // number of shards for concurrent map
 		path, // db path
@@ -32,7 +32,7 @@ func TestClient(t *testing.T) {
 	defer os.RemoveAll(path)
 	time.Sleep(5 * time.Second) // just wait for server to be started
 
-	cli, err := InitPureKvClient("0.0.0.0:6666", uint(5))
+	cli, err := InitPureKvClient("0.0.0.0:6667", uint(5))
 	if err != nil {
 		t.Fatal(err)
 	}
