@@ -47,7 +47,7 @@ err = cli.Del("BucketName", "someKey")
 err = cli.Destroy("BucketName") 
 ```  
 
-[Server](https://github.com/gasparian/pure-kv-go/blob/main/main.go):  
+[Server:](https://github.com/gasparian/pure-kv-go/blob/main/main.go)  
 ```go
 
 import (
