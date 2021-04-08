@@ -4,4 +4,4 @@ go test -v \
         -bench=. \
         -benchtime=0.1s \
         -trace trace.out \
-        ./core
+        {1}

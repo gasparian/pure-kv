@@ -2,9 +2,11 @@ package client
 
 import (
 	"bytes"
+	"errors"
 	"io/ioutil"
 	"os"
 	"pure-kv-go/server"
+	"sync"
 	"testing"
 	"time"
 )
@@ -36,9 +38,11 @@ func TestClient(t *testing.T) {
 	}
 	defer cli.Close()
 
-	valSet := []byte{'a'}
 	bucketName := "test"
-	key := "key"
+	keys := []string{
+		"key1", "key2",
+	}
+	valSet := []byte{'a'}
 
 	t.Run("CreateBucket", func(t *testing.T) {
 		err := cli.Create(bucketName)
@@ -48,30 +52,82 @@ func TestClient(t *testing.T) {
 	})
 
 	t.Run("SetVal", func(t *testing.T) {
-		err := cli.Set(bucketName, key, valSet)
+		err := cli.Set(bucketName, keys[0], valSet)
 		if err != nil {
 			t.Error(err)
 		}
 	})
 
+	t.Run("ConcurrentSet", func(t *testing.T) {
+		errs := make(chan error)
+		go func() {
+			wg := sync.WaitGroup{}
+			wg.Add(10)
+			for i := 0; i < 10; i++ {
+				go func() {
+					defer wg.Done()
+					err := cli.Set(bucketName, keys[0], valSet)
+					if err != nil {
+						errs <- err
+					}
+				}()
+			}
+			wg.Wait()
+			close(errs)
+		}()
+		for err := range errs {
+			if err != nil {
+				t.Error(err)
+			}
+		}
+	})
+
 	t.Run("GetVal", func(t *testing.T) {
-		val, ok := cli.Get(bucketName, key)
+		val, ok := cli.Get(bucketName, keys[0])
 		if !ok || bytes.Compare(val, valSet) != 0 {
 			t.Error("Can't get the value from map")
 		}
 	})
 
+	t.Run("ConcurrentGet", func(t *testing.T) {
+		errs := make(chan error)
+		go func() {
+			wg := sync.WaitGroup{}
+			wg.Add(10)
+			for i := 0; i < 10; i++ {
+				go func() {
+					defer wg.Done()
+					val, ok := cli.Get(bucketName, keys[0])
+					if !ok || bytes.Compare(val, valSet) != 0 {
+						errs <- errors.New("Can't get the value from map")
+						return
+					}
+				}()
+			}
+			wg.Wait()
+			close(errs)
+		}()
+		for err := range errs {
+			if err != nil {
+				t.Error(err)
+			}
+		}
+	})
+
 	t.Run("MakeIterator", func(t *testing.T) {
+		cli.Set(bucketName, keys[1], valSet)
 		err := cli.MakeIterator(bucketName)
 		if err != nil {
 			t.Error(err)
 		}
 	})
 
-	t.Run("GetIterator", func(t *testing.T) {
-		k, val, err := cli.Next(bucketName)
-		if err != nil || bytes.Compare(val, valSet) != 0 || k != key {
-			t.Error("Can't get the value from map iterator")
+	t.Run("GetNext", func(t *testing.T) {
+		for range keys {
+			_, val, err := cli.Next(bucketName)
+			if err != nil || bytes.Compare(val, valSet) != 0 {
+				t.Error("Can't get the value from map iterator")
+			}
 		}
 	})
 
@@ -87,9 +143,17 @@ func TestClient(t *testing.T) {
 	})
 
 	t.Run("DeleteVal", func(t *testing.T) {
-		err = cli.Del(bucketName, key)
+		err = cli.Del(bucketName, keys[0])
 		if err != nil {
 			t.Error(err)
+		}
+	})
+
+	t.Run("GetValAfterDel", func(t *testing.T) {
+		time.Sleep(250 * time.Millisecond)
+		_, ok := cli.Get(bucketName, keys[0])
+		if ok {
+			t.Error("Value should be deleted")
 		}
 	})
 
@@ -97,6 +161,14 @@ func TestClient(t *testing.T) {
 		err = cli.Destroy(bucketName)
 		if err != nil {
 			t.Error(err)
+		}
+	})
+
+	t.Run("GetValAfterDestroy", func(t *testing.T) {
+		time.Sleep(250 * time.Millisecond)
+		_, ok := cli.Get(bucketName, keys[1])
+		if ok {
+			t.Error("Value should be deleted")
 		}
 	})
 }

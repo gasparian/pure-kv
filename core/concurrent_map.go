@@ -125,15 +125,16 @@ func (m ConcurrentMap) SetBucket(bucketName string) {
 }
 
 // Set places value in the needed shard by string key
-func (m ConcurrentMap) Set(bucketName, key string, value []byte) {
+func (m ConcurrentMap) Set(bucketName, key string, value []byte) error {
 	shard := m.getShard(key)
 	shard.mutex.Lock()
 	bucket, ok := shard.Items[bucketName]
 	if !ok {
-		return
+		return errBucketCantBeFound
 	}
 	bucket[key] = value
 	shard.mutex.Unlock()
+	return nil
 }
 
 // Get returns value by string key

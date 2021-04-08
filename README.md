@@ -29,7 +29,7 @@ import (
 )
 
 // creates client instance providing server address and timetout in sec. 
-cli, err := pkv.client.InitPureKvClient("0.0.0.0:8001", uint(30))
+cli, err := pkv.client.InitPureKvClient("0.0.0.0:6666", uint(30))
 defer cli.Close() 
 // creates the new bucket with specified key-value pair type
 err = cli.Create("BucketName") 
@@ -68,25 +68,25 @@ func main() {
 
 ### Tests  
 
-Unit tests:  
+Run test by package or left argument empty to run all tests:  
 ```
 ./test.sh {PACKAGE}
 ```  
 
 Benchmark tests for concurrent map:  
 ```
-./bench.sh
+./bench.sh {PACKAGE}
 ```  
 Benchmark will generate cpu ans mem profiles, which could be examined with the `pprof` tool.  
 
 Data race tests based on benchmark:  
 ```
-./test_race.sh
+./test_race.sh {PACKAGE}
 ```  
 
 Tracing:  
 ```
-./bench_trace.sh
+./bench_trace.sh {PACKAGE}
 ```  
 Benchmark will generate `trace.out`, you then need to run tool for diagnostics:  
 ```

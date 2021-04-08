@@ -2,7 +2,10 @@ package core
 
 import (
 	"bytes"
+	"errors"
 	"os"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 )
@@ -49,6 +52,47 @@ func TestSetGet(t *testing.T) {
 	ok = m.Has(bucketName, key)
 	if ok {
 		t.Error("Key should not be exist")
+	}
+}
+
+func TestSetGetConcurrent(t *testing.T) {
+	t.Parallel()
+	m := NewMap(32)
+	bucketName := "test"
+	val := []byte{'a'}
+	m.SetBucket(bucketName)
+	wg := sync.WaitGroup{}
+	wg.Add(10)
+	for i := 0; i < 10; i++ {
+		go func(i int) {
+			k := strconv.Itoa(i)
+			go m.Set(bucketName, k, val)
+			go m.Set(bucketName, k, val)
+			wg.Done()
+		}(i)
+	}
+	wg.Wait()
+
+	errs := make(chan error)
+	go func() {
+		wg.Add(10)
+		for i := 0; i < 10; i++ {
+			go func(i int) {
+				defer wg.Done()
+				k := strconv.Itoa(i)
+				ok := m.Has(bucketName, k)
+				if !ok {
+					errs <- errors.New("Key should exist")
+				}
+			}(i)
+		}
+		wg.Wait()
+		close(errs)
+	}()
+	for err := range errs {
+		if err != nil {
+			t.Error(err)
+		}
 	}
 }
 
