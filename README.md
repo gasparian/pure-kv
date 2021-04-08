@@ -13,7 +13,7 @@ Features:
  * supports buckets so you can organize your storage better;  
  * supports iteration over buckets' contence;  
  * persistant by default;  
- * doesn't depend on any third-party libraries;  
+ * doesn't depend on third-party libraries;  
 
 ### Install  
 ```
