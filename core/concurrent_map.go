@@ -248,11 +248,7 @@ func (m ConcurrentMap) iterShard(fn shardProcessor) error {
 
 // Dump serilizes buckets and writes them to disk in parallel
 func (m ConcurrentMap) Dump(path string) error {
-	err := os.RemoveAll(path)
-	if err != nil {
-		return err
-	}
-	err = os.MkdirAll(path, FileMode)
+	err := CleanDir(path)
 	if err != nil {
 		return err
 	}

@@ -1,3 +1,74 @@
 package server
 
-// TODO:
+import (
+	"os"
+	"pure-kv-go/core"
+	"testing"
+	"time"
+)
+
+func TestServer(t *testing.T) {
+	path := "/tmp/pure-kv-db"
+	srv := InitServer(
+		6666, // port
+		1,    // persistence timeout sec.
+		32,   // number of shards for concurrent map
+		path, // db path
+	)
+	defer func() {
+		err := srv.Close()
+		if err != nil {
+			t.Error(err)
+		}
+		t.Log("Server listener closed")
+		os.RemoveAll(path)
+	}()
+
+	req := core.Request{Bucket: "test"}
+	req.Key = "key"
+	req.Value = []byte{'a'}
+
+	t.Run("PopulateDb", func(t *testing.T) {
+		resp := &core.Response{}
+		err := srv.db.Create(req, resp)
+		if err != nil || !resp.Ok {
+			t.Error("Can't create a bucket")
+		}
+		resp = &core.Response{}
+		err = srv.db.Set(req, resp)
+		if err != nil || !resp.Ok {
+			t.Error("Can't set the value")
+		}
+	})
+
+	t.Run("Persist", func(t *testing.T) {
+		go srv.persist()
+		time.Sleep(2 * time.Second)
+		err := core.CheckDirFiles(path)
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
+	t.Run("LoadDb", func(t *testing.T) {
+		time.Sleep(1 * time.Second)
+		resp := &core.Response{}
+		err := srv.db.Del(req, resp)
+		if err != nil {
+			t.Error(err)
+		}
+		err = srv.loadDb()
+		if err != nil {
+			t.Error(err)
+		}
+		resp = &core.Response{}
+		err = srv.db.Get(req, resp)
+		if err != nil || !resp.Ok {
+			t.Error("Can't find a key")
+		}
+	})
+
+	t.Run("StartStopRpc", func(t *testing.T) {
+		go srv.startRPC()
+	})
+}

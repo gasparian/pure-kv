@@ -1,7 +1,6 @@
 package server
 
 import (
-	"errors"
 	"log"
 	"net"
 	"net/rpc"
@@ -11,10 +10,6 @@ import (
 	"time"
 )
 
-var (
-	errPortNotSpecified = errors.New("port must be specified")
-)
-
 // Server holds config for RPC server
 type Server struct {
 	Port               int
@@ -22,12 +17,6 @@ type Server struct {
 	DbPath             string
 	db                 *core.PureKv
 	listener           net.Listener
-}
-
-// CleanDir removes all contents of the directory
-func (s *Server) CleanDir() {
-	os.RemoveAll(s.DbPath)
-	os.MkdirAll(s.DbPath, core.FileMode)
 }
 
 // InitServer creates a new instance of Server
@@ -44,49 +33,49 @@ func InitServer(port, persistanceTimeout, shards int, dbPath string) *Server {
 // Close terminates the server listener
 func (s *Server) Close() error {
 	if s.listener != nil {
+		log.Println("Closing server listener")
 		err := s.listener.Close()
 		return err
 	}
 	return nil
 }
 
-// LoadDb loads db using specified path
-func (s *Server) LoadDb() error {
+// loadDb loads db using specified path
+func (s *Server) loadDb() error {
 	return s.db.Buckets.Load(s.DbPath)
 }
 
-// Persist dumps db on disk periodically
-func (s *Server) Persist() {
+// persist dumps db on disk periodically
+func (s *Server) persist() {
 	for {
 		err := s.db.Buckets.Dump(s.DbPath)
 		if err != nil {
-			log.Panicln(err)
+			panic(err)
 		}
 		time.Sleep(time.Duration(s.PersistanceTimeout) * time.Second)
 	}
 }
 
-// StartRPC starts a new listener and registers the RPC server
-func (s *Server) StartRPC() error {
+// startRPC starts a new listener and registers the RPC server
+func (s *Server) startRPC() {
 	if s.Port <= 0 {
-		return errPortNotSpecified
+		panic("Port must be a positive integer")
 	}
 	rpc.Register(s.db)
 	var err error
 	s.listener, err = net.Listen("tcp", ":"+strconv.Itoa(s.Port))
 	if err != nil {
-		return err
+		panic(err)
 	}
 	log.Println("Server started")
 	rpc.Accept(s.listener)
-	return nil
 }
 
 // Run loads db and creates the new RPC server
 func (s *Server) Run() {
 	defer s.Close()
 
-	s.LoadDb()
+	s.loadDb()
 
 	go func() {
 		core.HandleSignals()
@@ -95,11 +84,11 @@ func (s *Server) Run() {
 		os.Exit(0)
 	}()
 
-	s.CleanDir()
-	go s.Persist()
-
-	err := s.StartRPC()
+	err := core.CleanDir(s.DbPath)
 	if err != nil {
-		log.Panicln(err)
+		panic(err)
 	}
+	go s.persist()
+
+	s.startRPC()
 }

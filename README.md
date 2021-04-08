@@ -8,12 +8,12 @@ Simple and fast in-memory key-value storage with RPC interface, written in go.
 
 Features:  
  * uses RPC interface;  
- * supports buckets so you can organize your storage better;  
+ * uses concurrency-efficient map;  
  * stores byte arrays only;  
- * uses concurrency-effective maps;  
- * supports iteration over maps;  
- * persistant;  
- * doesn't depend on any third-party library;  
+ * supports buckets so you can organize your storage better;  
+ * supports iteration over buckets' contence;  
+ * persistant by default;  
+ * doesn't depend on any third-party libraries;  
 
 ### Install  
 ```
@@ -28,7 +28,7 @@ import (
     pkv "github.com/gasparian/pure-kv-go"
 )
 
-// creates client instance providing server address and timetout in sec. 
+// creates client instance by providing server address and timetout in sec. 
 cli, err := pkv.client.InitPureKvClient("0.0.0.0:6666", uint(30))
 defer cli.Close() 
 // creates the new bucket with specified key-value pair type
@@ -62,33 +62,20 @@ func main() {
         32, // number of shards for concurrent map
         "/tmp/pure-kv-db", // db path
     )
-    srv.Run()
+    srv.Run() // <-- blocks
 }
 ```  
 
 ### Tests  
 
-Run test by package or left argument empty to run all tests:  
+You can run tests by package or left argument empty to run all the tests:  
 ```
 ./test.sh {PACKAGE}
 ```  
 
-Benchmark tests for concurrent map:  
+Optionally you can run benchmarks for the concurrent map:  
 ```
-./bench.sh {PACKAGE}
-```  
-Benchmark will generate cpu ans mem profiles, which could be examined with the `pprof` tool.  
-
-Data race tests based on benchmark:  
-```
-./test_race.sh {PACKAGE}
-```  
-
-Tracing:  
-```
-./bench_trace.sh {PACKAGE}
-```  
-Benchmark will generate `trace.out`, you then need to run tool for diagnostics:  
-```
-go tool trace trace.out
+./bench.sh
+./test_race.sh
+./bench_trace.sh
 ```  
