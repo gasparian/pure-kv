@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	path = "/tmp/pure-kv-db"
+	path = "/tmp/pure-kv-db/client-test"
 )
 
 func prepareServer(t *testing.T) func() error {

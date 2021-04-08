@@ -8,7 +8,7 @@ import (
 )
 
 func TestServer(t *testing.T) {
-	path := "/tmp/pure-kv-db"
+	path := "/tmp/pure-kv-db/server-test"
 	srv := InitServer(
 		6666, // port
 		1,    // persistence timeout sec.
