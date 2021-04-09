@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/binary"
 	"errors"
 	"sync"
 )
@@ -28,6 +29,19 @@ func NewPureKv(shardsNumber int) *PureKv {
 		Iterators: &mapIterators{Items: make(map[string]chan string)},
 		Buckets:   NewMap(shardsNumber),
 	}
+}
+
+// Size calcaulates total number of instances in the map
+func (kv *PureKv) Size(req Request, res *Response) error {
+	val, err := kv.Buckets.Size(req.Bucket)
+	if err != nil {
+		return err
+	}
+	b := make([]byte, 8)
+	binary.LittleEndian.PutUint64(b, val)
+	res.Value = b
+	res.Ok = true
+	return nil
 }
 
 // Create instantiates the new map

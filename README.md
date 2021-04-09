@@ -31,18 +31,29 @@ import (
 // creates client instance by providing server address and timetout in sec. 
 cli, err := pkv.client.InitPureKvClient("0.0.0.0:6666", uint(30))
 defer cli.Close() 
+
 // creates the new bucket with specified key-value pair type
 err = cli.Create("BucketName") 
+
 // creates new key-value pair in the specified bucket
 err = cli.Set("BucketName", "someKey", []byte{'a'}) 
+
 // returns decoded value
 val, ok := cli.Get("BucketName", "someKey") 
+
+// returns size of specified bucket or the total number of records in storage
+bucketSize, err := cli.Size("BucketName") 
+size, err := cli.Size("")
+
 // makes new iterator for specified bucket
 err = cli.MakeIterator("BucketName")
+
 // get next element of bucket
 k, val, err := cli.Next("BucketName") 
+
 // async. delete value from the bucket
 err = cli.Del("BucketName", "someKey") 
+
 // async. delete the specified bucket
 err = cli.Destroy("BucketName") 
 ```  

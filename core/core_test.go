@@ -2,6 +2,7 @@ package core
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"os"
 	"strconv"
@@ -15,16 +16,22 @@ func TestBucket(t *testing.T) {
 	m := NewMap(32)
 	bucketName := "test"
 	m.SetBucket(bucketName)
-	ok := m.HasBucket(bucketName)
-	if !ok {
-		t.Error("Bucket `test` should exist")
-	}
-	m.DelBucket(bucketName)
-	time.Sleep(250 * time.Millisecond)
-	ok = m.HasBucket(bucketName)
-	if ok {
-		t.Error("Bucket `test` should not be exist")
-	}
+
+	t.Run("HasBucket", func(t *testing.T) {
+		ok := m.HasBucket(bucketName)
+		if !ok {
+			t.Error("Bucket `test` should exist")
+		}
+	})
+
+	t.Run("DelBucket", func(t *testing.T) {
+		m.DelBucket(bucketName)
+		time.Sleep(250 * time.Millisecond)
+		ok := m.HasBucket(bucketName)
+		if ok {
+			t.Error("Bucket `test` should not be exist")
+		}
+	})
 }
 
 func TestSetGet(t *testing.T) {
@@ -33,26 +40,54 @@ func TestSetGet(t *testing.T) {
 	bucketName := "test"
 	key := "key"
 	val := []byte{'a'}
-	m.SetBucket(bucketName)
-	m.Set(bucketName, key, val)
-	ok := m.Has(bucketName, key)
-	if !ok {
-		t.Error("Key should exist")
-	}
-	valGet, ok := m.Get(bucketName, key)
-	if !ok {
-		t.Error("Key should exist")
-	}
-	res := bytes.Compare(val, valGet)
-	if res != 0 {
-		t.Error("Values should be equal")
-	}
-	m.Del(bucketName, key)
-	time.Sleep(250 * time.Millisecond)
-	ok = m.Has(bucketName, key)
-	if ok {
-		t.Error("Key should not be exist")
-	}
+
+	t.Run("Set", func(t *testing.T) {
+		m.SetBucket(bucketName)
+		err := m.Set(bucketName, key, val)
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
+	t.Run("HasKey", func(t *testing.T) {
+		ok := m.Has(bucketName, key)
+		if !ok {
+			t.Error("Key should exist")
+		}
+	})
+
+	t.Run("Size", func(t *testing.T) {
+		m.SetBucket("test2")
+		m.Set("test2", "key2", val)
+		size, err := m.Size("")
+		if err != nil || size < 2 {
+			t.Error("Can't get size of the map")
+		}
+		bucketSize, err := m.Size(bucketName)
+		if err != nil || bucketSize != 1 {
+			t.Error("Bucket size and total size are not equal")
+		}
+	})
+
+	t.Run("GetKey", func(t *testing.T) {
+		valGet, ok := m.Get(bucketName, key)
+		if !ok {
+			t.Error("Key should exist")
+		}
+		res := bytes.Compare(val, valGet)
+		if res != 0 {
+			t.Error("Values should be equal")
+		}
+	})
+
+	t.Run("DelKey", func(t *testing.T) {
+		m.Del(bucketName, key)
+		time.Sleep(250 * time.Millisecond)
+		ok := m.Has(bucketName, key)
+		if ok {
+			t.Error("Key should not be exist")
+		}
+	})
 }
 
 func TestSetGetConcurrent(t *testing.T) {
@@ -61,39 +96,45 @@ func TestSetGetConcurrent(t *testing.T) {
 	bucketName := "test"
 	val := []byte{'a'}
 	m.SetBucket(bucketName)
-	wg := sync.WaitGroup{}
-	wg.Add(10)
-	for i := 0; i < 10; i++ {
-		go func(i int) {
-			k := strconv.Itoa(i)
-			go m.Set(bucketName, k, val)
-			go m.Set(bucketName, k, val)
-			wg.Done()
-		}(i)
-	}
-	wg.Wait()
 
-	errs := make(chan error)
-	go func() {
+	t.Run("Set", func(t *testing.T) {
+		wg := sync.WaitGroup{}
 		wg.Add(10)
 		for i := 0; i < 10; i++ {
 			go func(i int) {
-				defer wg.Done()
 				k := strconv.Itoa(i)
-				ok := m.Has(bucketName, k)
-				if !ok {
-					errs <- errors.New("Key should exist")
-				}
+				go m.Set(bucketName, k, val)
+				go m.Set(bucketName, k, val)
+				wg.Done()
 			}(i)
 		}
 		wg.Wait()
-		close(errs)
-	}()
-	for err := range errs {
-		if err != nil {
-			t.Error(err)
+	})
+
+	t.Run("Get", func(t *testing.T) {
+		wg := sync.WaitGroup{}
+		wg.Add(10)
+		errs := make(chan error)
+		go func() {
+			for i := 0; i < 10; i++ {
+				go func(i int) {
+					defer wg.Done()
+					k := strconv.Itoa(i)
+					ok := m.Has(bucketName, k)
+					if !ok {
+						errs <- errors.New("Key should exist")
+					}
+				}(i)
+			}
+			wg.Wait()
+			close(errs)
+		}()
+		for err := range errs {
+			if err != nil {
+				t.Error(err)
+			}
 		}
-	}
+	})
 }
 
 func TestIterator(t *testing.T) {
@@ -130,25 +171,32 @@ func TestIterator(t *testing.T) {
 
 func TestDumpLoad(t *testing.T) {
 	t.Parallel()
-	path := "/tmp/pure-kv-go"
+	path := "/tmp/pure-kv-db-core-test"
 	defer os.RemoveAll(path)
 	m := NewMap(32)
 	bucketName := "test"
 	m.SetBucket(bucketName)
 	m.Set(bucketName, "key1", []byte{'a'})
-	err := m.Dump(path)
-	if err != nil {
-		t.Error(err)
-	}
-	m2 := NewMap(32)
-	err = m2.Load(path)
-	if err != nil {
-		t.Error(err)
-	}
-	_, ok := m2.Get(bucketName, "key1")
-	if !ok {
-		t.Error("Key is not not in map after load")
-	}
+
+	t.Run("Dump", func(t *testing.T) {
+		err := m.Dump(path)
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
+	t.Run("Load", func(t *testing.T) {
+		m2 := NewMap(32)
+		err := m2.Load(path)
+		if err != nil {
+			t.Error(err)
+		}
+		_, ok := m2.Get(bucketName, "key1")
+		if !ok {
+			t.Error("Key must be in map after load")
+		}
+	})
+
 }
 
 func TestPureKvBuckets(t *testing.T) {
@@ -156,22 +204,40 @@ func TestPureKvBuckets(t *testing.T) {
 	pkv := NewPureKv(32)
 	req := Request{Bucket: "test"}
 	req.Key = "key"
-	resp := &Response{}
-	err := pkv.Create(req, resp)
-	if !resp.Ok || err != nil {
-		t.Errorf("Bucket has not been created: %v", err)
-	}
-	resp = &Response{}
-	err = pkv.Destroy(req, resp)
-	time.Sleep(250 * time.Millisecond)
-	if !resp.Ok || err != nil {
-		t.Errorf("Bucket has not been deleted: %v", err)
-	}
-	resp = &Response{}
-	err = pkv.MakeIterator(req, resp)
-	if !(!resp.Ok && err != nil) {
-		t.Error("Bucket is not exist, should be an error here!")
-	}
+
+	t.Run("Create", func(t *testing.T) {
+		resp := &Response{}
+		err := pkv.Create(req, resp)
+		if !resp.Ok || err != nil {
+			t.Errorf("Bucket has not been created: %v", err)
+		}
+	})
+
+	t.Run("Destroy", func(t *testing.T) {
+		resp := &Response{}
+		err := pkv.Destroy(req, resp)
+		time.Sleep(250 * time.Millisecond)
+		if !resp.Ok || err != nil {
+			t.Errorf("Bucket has not been deleted: %v", err)
+		}
+	})
+
+	t.Run("MakeIterator", func(t *testing.T) {
+		resp := &Response{}
+		err := pkv.MakeIterator(req, resp)
+		if !(!resp.Ok && err != nil) {
+			t.Error("Bucket must not exist yet!")
+		}
+	})
+
+	t.Run("Size", func(t *testing.T) {
+		resp := &Response{}
+		err := pkv.Size(req, resp)
+		size := binary.LittleEndian.Uint64(resp.Value)
+		if !resp.Ok || err != nil || size != 0 {
+			t.Error("Bucket must be empty")
+		}
+	})
 }
 
 func TestPureKvSetGet(t *testing.T) {
@@ -182,29 +248,50 @@ func TestPureKvSetGet(t *testing.T) {
 	req.Value = []byte{'a'}
 	resp := &Response{}
 	pkv.Create(req, resp)
-	err := pkv.Set(req, resp)
-	if !resp.Ok || err != nil {
-		t.Errorf("Can't set the value: %v", err)
-	}
-	resp = &Response{}
-	err = pkv.Get(req, resp)
-	if !resp.Ok || err != nil {
-		t.Errorf("Can't get the value: %v", err)
-	}
-	if bytes.Compare(resp.Value, req.Value) != 0 {
-		t.Error("Value is not valid")
-	}
-	resp = &Response{}
-	err = pkv.Del(req, resp)
-	time.Sleep(250 * time.Millisecond)
-	if !resp.Ok || err != nil {
-		t.Errorf("Can't delete the value: %v", err)
-	}
-	resp = &Response{}
-	err = pkv.Get(req, resp)
-	if !(!resp.Ok && err != nil) {
-		t.Errorf("Error getting deleted value: %v", err)
-	}
+
+	t.Run("Set", func(t *testing.T) {
+		err := pkv.Set(req, resp)
+		if !resp.Ok || err != nil {
+			t.Errorf("Can't set the value: %v", err)
+		}
+	})
+
+	t.Run("Get", func(t *testing.T) {
+		resp := &Response{}
+		err := pkv.Get(req, resp)
+		if !resp.Ok || err != nil {
+			t.Errorf("Can't get the value: %v", err)
+		}
+		if bytes.Compare(resp.Value, req.Value) != 0 {
+			t.Error("Value is not valid")
+		}
+	})
+
+	t.Run("Size", func(t *testing.T) {
+		resp := &Response{}
+		err := pkv.Size(req, resp)
+		size := binary.LittleEndian.Uint64(resp.Value)
+		if !resp.Ok || err != nil || size != 1 {
+			t.Error("Map must contain a single object")
+		}
+	})
+
+	t.Run("Del", func(t *testing.T) {
+		resp := &Response{}
+		err := pkv.Del(req, resp)
+		time.Sleep(250 * time.Millisecond)
+		if !resp.Ok || err != nil {
+			t.Errorf("Can't delete the value: %v", err)
+		}
+	})
+
+	t.Run("GetAfterDel", func(t *testing.T) {
+		resp := &Response{}
+		err := pkv.Get(req, resp)
+		if !(!resp.Ok && err != nil) {
+			t.Errorf("Error getting deleted value: %v", err)
+		}
+	})
 }
 
 func TestPureKvIter(t *testing.T) {

@@ -1,6 +1,8 @@
 package server
 
 import (
+	"encoding/binary"
+	"net/rpc"
 	"os"
 	"pure-kv-go/core"
 	"testing"
@@ -8,7 +10,7 @@ import (
 )
 
 func TestServer(t *testing.T) {
-	path := "/tmp/pure-kv-db/server-test"
+	path := "/tmp/pure-kv-db-server-test"
 	srv := InitServer(
 		6666, // port
 		1,    // persistence timeout sec.
@@ -20,8 +22,11 @@ func TestServer(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		t.Log("Server listener closed")
-		os.RemoveAll(path)
+		err = os.RemoveAll(path)
+		if err != nil {
+			t.Error(err)
+		}
+		t.Log("Server listener closed, artefacts deleted")
 	}()
 
 	req := core.Request{Bucket: "test"}
@@ -70,5 +75,19 @@ func TestServer(t *testing.T) {
 
 	t.Run("StartStopRpc", func(t *testing.T) {
 		go srv.startRPC()
+		time.Sleep(1 * time.Second)
+		c, err := rpc.Dial("tcp", "0.0.0.0:6666")
+		if err != nil {
+			t.Error(err)
+		}
+		var resp = new(core.Response)
+		err = c.Call("PureKv.Size", req, resp)
+		if err != nil {
+			t.Error(err)
+		}
+		size := binary.LittleEndian.Uint64(resp.Value)
+		if size != 1 {
+			t.Error("Must contain a single element")
+		}
 	})
 }

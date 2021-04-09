@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+	"sync/atomic"
 )
 
 var (
@@ -122,6 +123,26 @@ func (m ConcurrentMap) SetBucket(bucketName string) {
 			wg.Done()
 		},
 	)
+}
+
+// Size calculates number of elements in a bucket or total size of the map
+func (m ConcurrentMap) Size(bucketName string) (uint64, error) {
+	var size uint64 = 0
+	err := m.iterShard(
+		func(idx int, sh *MapShard, wg *sync.WaitGroup, errs chan error) {
+			sh.mutex.RLock()
+			if len(bucketName) == 0 {
+				for _, v := range sh.Items {
+					atomic.AddUint64(&size, uint64(len(v)))
+				}
+			} else {
+				atomic.AddUint64(&size, uint64(len(sh.Items[bucketName])))
+			}
+			sh.mutex.RUnlock()
+			wg.Done()
+		},
+	)
+	return size, err
 }
 
 // Set places value in the needed shard by string key

@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"net/rpc"
 	"pure-kv-go/core"
@@ -9,6 +10,7 @@ import (
 )
 
 var (
+	errCantGetSize         = errors.New("unable to get number of stored elements")
 	errCantCreateNewBucket = errors.New("unable to create new bucket")
 	errCantDeleteBucket    = errors.New("unable to delete the bucket")
 	errCantDeleteKey       = errors.New("unable to delete key")
@@ -69,6 +71,21 @@ func (c *Client) executeWrapper(ctx context.Context, methodName string, req *cor
 		}
 		return response
 	}
+}
+
+// Size requests number of elements in the storage
+func (c *Client) Size(bucketName string) (uint64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
+	defer cancel()
+	request := &core.Request{
+		Bucket: bucketName,
+	}
+	resp := c.executeWrapper(ctx, core.Size, request)
+	if resp == nil {
+		return 0, errCantGetSize
+	}
+	size := binary.LittleEndian.Uint64(resp.Value)
+	return size, nil
 }
 
 // Create makes RPC for creating the new map on the server

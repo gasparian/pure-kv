@@ -10,6 +10,7 @@ import (
 
 // Shortcuts for RPC methods
 const (
+	Size     = "PureKv.Size"
 	Create   = "PureKv.Create"
 	Destroy  = "PureKv.Destroy"
 	Del      = "PureKv.Del"

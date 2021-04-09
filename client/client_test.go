@@ -12,12 +12,12 @@ import (
 )
 
 const (
-	path = "/tmp/pure-kv-db/client-test"
+	path = "/tmp/pure-kv-db-client-test"
 )
 
 func prepareServer(t *testing.T) func() error {
 	srv := server.InitServer(
-		6667, // port
+		6668, // port
 		2,    // persistence timeout sec.
 		32,   // number of shards for concurrent map
 		path, // db path
@@ -28,11 +28,11 @@ func prepareServer(t *testing.T) func() error {
 }
 
 func TestClient(t *testing.T) {
-	defer prepareServer(t)()
 	defer os.RemoveAll(path)
+	defer prepareServer(t)()
 	time.Sleep(5 * time.Second) // just wait for server to be started
 
-	cli, err := InitPureKvClient("0.0.0.0:6667", uint(5))
+	cli, err := InitPureKvClient("0.0.0.0:6668", uint(5))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,6 +55,17 @@ func TestClient(t *testing.T) {
 		err := cli.Set(bucketName, keys[0], valSet)
 		if err != nil {
 			t.Error(err)
+		}
+	})
+
+	t.Run("Size", func(t *testing.T) {
+		bucketSize, err := cli.Size(bucketName)
+		if err != nil || bucketSize != 1 {
+			t.Error("Must contain a single record")
+		}
+		size, err := cli.Size("")
+		if err != nil || size != bucketSize {
+			t.Error("Total size must be equal to bucket size")
 		}
 	})
 

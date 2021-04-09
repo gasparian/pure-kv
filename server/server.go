@@ -7,6 +7,7 @@ import (
 	"os"
 	"pure-kv-go/core"
 	"strconv"
+	"sync/atomic"
 	"time"
 )
 
@@ -17,6 +18,7 @@ type Server struct {
 	DbPath             string
 	db                 *core.PureKv
 	listener           net.Listener
+	closed             uint32
 }
 
 // InitServer creates a new instance of Server
@@ -35,6 +37,9 @@ func (s *Server) Close() error {
 	if s.listener != nil {
 		log.Println("Closing server listener")
 		err := s.listener.Close()
+		if err == nil {
+			atomic.AddUint32(&s.closed, 1)
+		}
 		return err
 	}
 	return nil
@@ -47,7 +52,7 @@ func (s *Server) loadDb() error {
 
 // persist dumps db on disk periodically
 func (s *Server) persist() {
-	for {
+	for atomic.LoadUint32(&s.closed) == 0 {
 		err := s.db.Buckets.Dump(s.DbPath)
 		if err != nil {
 			panic(err)
@@ -73,8 +78,6 @@ func (s *Server) startRPC() {
 
 // Run loads db and creates the new RPC server
 func (s *Server) Run() {
-	defer s.Close()
-
 	s.loadDb()
 
 	go func() {
