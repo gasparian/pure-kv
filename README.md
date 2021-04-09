@@ -20,6 +20,14 @@ Features:
 go get github.com/gasparian/pure-kv-go
 ```  
 
+### Run  
+```
+./main --port 6666 \
+       --persist_time 60 \
+       --db_path /tmp/pure-kv-db \
+       --shards 32
+```  
+
 ### Usage  
 
 Client:  
