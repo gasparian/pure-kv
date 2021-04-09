@@ -22,6 +22,7 @@ go get github.com/gasparian/pure-kv-go
 
 ### Run  
 ```
+./build.sh
 ./main --port 6666 \
        --persist_time 60 \
        --db_path /tmp/pure-kv-db \
