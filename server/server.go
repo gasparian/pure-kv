@@ -66,6 +66,7 @@ func (s *Server) startRPC() {
 	if s.Port <= 0 {
 		panic("Port must be a positive integer")
 	}
+	atomic.StoreUint32(&s.closed, 0)
 	rpc.Register(s.db)
 	var err error
 	s.listener, err = net.Listen("tcp", ":"+strconv.Itoa(s.Port))
