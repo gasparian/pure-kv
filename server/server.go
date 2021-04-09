@@ -87,11 +87,6 @@ func (s *Server) Run() {
 		os.Exit(0)
 	}()
 
-	err := core.CleanDir(s.DbPath)
-	if err != nil {
-		panic(err)
-	}
 	go s.persist()
-
 	s.startRPC()
 }

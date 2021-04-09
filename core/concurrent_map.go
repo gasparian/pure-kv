@@ -269,14 +269,12 @@ func (m ConcurrentMap) iterShard(fn shardProcessor) error {
 
 // Dump serilizes buckets and writes them to disk in parallel
 func (m ConcurrentMap) Dump(path string) error {
-	err := CleanDir(path)
-	if err != nil {
-		return err
-	}
-	err = m.iterShard(
+	os.MkdirAll(path, FileMode)
+	err := m.iterShard(
 		func(idx int, sh *MapShard, wg *sync.WaitGroup, errs chan error) {
 			sh.mutex.RLock()
-			errs <- sh.Save(filepath.Join(path, strconv.Itoa(idx)))
+			fpath := filepath.Join(path, strconv.Itoa(idx))
+			errs <- sh.Save(fpath)
 			sh.mutex.RUnlock()
 			wg.Done()
 		},
@@ -289,7 +287,6 @@ func (m ConcurrentMap) Dump(path string) error {
 
 // Load loads buckets from disk in parallel
 func (m ConcurrentMap) Load(path string) error {
-	os.MkdirAll(path, FileMode)
 	err := m.iterShard(
 		func(idx int, sh *MapShard, wg *sync.WaitGroup, errs chan error) {
 			sh.mutex.Lock()
