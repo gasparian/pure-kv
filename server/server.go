@@ -5,7 +5,6 @@ import (
 	"log"
 	"net"
 	"net/rpc"
-	"os"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -63,31 +62,32 @@ func (s *Server) persist() {
 
 // startRPC starts a new listener and registers the RPC server
 func (s *Server) startRPC() {
+	atomic.StoreUint32(&s.closed, 0)
 	if s.Port <= 0 {
 		panic("Port must be a positive integer")
 	}
-	atomic.StoreUint32(&s.closed, 0)
+	defer func() {
+		time.Sleep(100 * time.Millisecond)
+		if atomic.LoadUint32(&s.closed) == 0 {
+			s.Close()
+		}
+	}()
+
 	rpc.Register(s.db)
+
 	var err error
 	s.listener, err = net.Listen("tcp", ":"+strconv.Itoa(s.Port))
 	if err != nil {
 		panic(err)
 	}
-	log.Println("Server started")
+
+	log.Println("Starting server")
 	rpc.Accept(s.listener)
 }
 
 // Run loads db and creates the new RPC server
 func (s *Server) Run() {
 	s.loadDb()
-
-	go func() {
-		core.HandleSignals()
-		log.Println("Signal recieved. terminating")
-		s.Close()
-		os.Exit(0)
-	}()
-
 	go s.persist()
 	s.startRPC()
 }

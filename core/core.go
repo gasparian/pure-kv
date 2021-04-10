@@ -4,8 +4,6 @@ import (
 	"errors"
 	"io/ioutil"
 	"os"
-	"os/signal"
-	"syscall"
 )
 
 // Shortcuts for RPC methods
@@ -38,14 +36,6 @@ type Response struct {
 type Request struct {
 	Record
 	Bucket string
-}
-
-// HandleSignals is a blocking function that waits for termination/interrupt signals
-func HandleSignals() {
-	signals := make(chan os.Signal, 1)
-
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
-	<-signals
 }
 
 // CleanDir removes everythin from specified directory
