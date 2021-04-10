@@ -33,50 +33,83 @@ go get github.com/gasparian/pure-kv-go
 
 Client:  
 ```go
+package main
+
 import (
-    pkv "github.com/gasparian/pure-kv-go"
+    "log"
+    pkv "github.com/gasparian/pure-kv-go/client"
 )
 
-// creates client instance by providing server address and timetout in sec. 
-cli, err := pkv.client.InitPureKvClient("0.0.0.0:6666", uint(30))
-defer cli.Close() 
-
-// creates the new bucket with specified key-value pair type
-err = cli.Create("BucketName") 
-
-// creates new key-value pair in the specified bucket
-err = cli.Set("BucketName", "someKey", []byte{'a'}) 
-
-// returns decoded value
-val, ok := cli.Get("BucketName", "someKey") 
-
-// returns size of specified bucket or the total number of records in storage
-bucketSize, err := cli.Size("BucketName") 
-size, err := cli.Size("")
-
-// makes new iterator for specified bucket
-err = cli.MakeIterator("BucketName")
-
-// get next element of bucket
-k, val, err := cli.Next("BucketName") 
-
-// async. delete value from the bucket
-err = cli.Del("BucketName", "someKey") 
-
-// async. delete the specified bucket
-err = cli.Destroy("BucketName") 
+func main() {
+    // creates client instance by providing server address and timetout in sec. 
+    cli, err := pkv.InitPureKvClient("0.0.0.0:6666", uint(30))
+    defer cli.Close() 
+    if err != nil {
+        log.Fatal(err)
+    }
+    // creates the new bucket with specified key-value pair type
+    err = cli.Create("BucketName") 
+    if err != nil {
+        log.Fatal(err)
+    }
+    // creates new key-value pair in the specified bucket
+    err = cli.Set("BucketName", "someKey", []byte{'a'}) 
+    if err != nil {
+        log.Fatal(err)
+    }
+    // returns decoded value
+    val, ok := cli.Get("BucketName", "someKey") 
+    if !ok {
+        log.Fatal("Can't get a value")
+    }    
+    log.Println(val)
+    // returns size of specified bucket
+    bucketSize, err := cli.Size("BucketName") 
+    if err != nil {
+        log.Fatal(err)
+    }
+    log.Println(bucketSize)
+    // makes new iterator for specified bucket
+    err = cli.MakeIterator("BucketName")
+    if err != nil {
+        log.Fatal(err)
+    }
+    // get next element of bucket
+    k, val, err := cli.Next("BucketName") 
+    if err != nil {
+        log.Fatal(err)
+    }
+    log.Println(k, val)
+    // async. delete value from the bucket
+    err = cli.Del("BucketName", "someKey") 
+    if err != nil {
+        log.Fatal(err)
+    }
+    // async. delete the specified bucket
+    err = cli.Destroy("BucketName") 
+    if err != nil {
+        log.Fatal(err)
+    }
+    // returns total number of records in storage
+    size, err := cli.Size("")
+    if err != nil {
+        log.Fatal(err)
+    }
+    log.Println(size)
+}
 ```  
 
 [Server:](https://github.com/gasparian/pure-kv-go/blob/main/main.go)  
 ```go
+package main
 
 import (
-    pkv "github.com/gasparian/pure-kv-go"
+    pkv "github.com/gasparian/pure-kv-go/server"
 )
 
 func main() {
     flag.Parse()
-    srv := server.InitServer(
+    srv := pkv.InitServer(
         6666, // port
         60, // persistence timeout sec.
         32, // number of shards for concurrent map
