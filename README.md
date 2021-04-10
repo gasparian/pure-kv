@@ -20,7 +20,7 @@ Features:
 go get github.com/gasparian/pure-kv-go
 ```  
 
-### Run  
+### Run server  
 ```
 ./build.sh
 ./main --port 6666 \

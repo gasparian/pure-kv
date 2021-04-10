@@ -2,9 +2,9 @@ package server
 
 import (
 	"encoding/binary"
+	"github.com/gasparian/pure-kv-go/core"
 	"net/rpc"
 	"os"
-	"pure-kv-go/core"
 	"testing"
 	"time"
 )

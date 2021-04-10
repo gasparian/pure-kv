@@ -3,9 +3,9 @@ package client
 import (
 	"bytes"
 	"errors"
+	"github.com/gasparian/pure-kv-go/server"
 	"io/ioutil"
 	"os"
-	"pure-kv-go/server"
 	"sync"
 	"testing"
 	"time"

@@ -1,11 +1,11 @@
 package server
 
 import (
+	"github.com/gasparian/pure-kv-go/core"
 	"log"
 	"net"
 	"net/rpc"
 	"os"
-	"pure-kv-go/core"
 	"strconv"
 	"sync/atomic"
 	"time"

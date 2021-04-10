@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"github.com/gasparian/pure-kv-go/core"
 	"net/rpc"
-	"pure-kv-go/core"
 	"time"
 )
 

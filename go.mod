@@ -1,3 +1,3 @@
-module pure-kv-go
+module github.com/gasparian/pure-kv-go
 
 go 1.13
