@@ -22,11 +22,11 @@ go get github.com/gasparian/pure-kv-go
 
 ### Run server  
 ```
-./build.sh
-./main --port 6666 \
-       --persist_time 60 \
-       --db_path /tmp/pure-kv-db \
-       --shards 32
+make compile
+./pure-kv-srv --port 6666 \
+              --persist_time 60 \
+              --db_path /tmp/pure-kv-db \
+              --shards 32
 ```  
 
 ### Usage  
@@ -123,12 +123,11 @@ func main() {
 
 You can run tests by package or left argument empty to run all the tests:  
 ```
-./test.sh {PACKAGE}
+make test path={PACKAGE}
 ```  
 
 Optionally you can run benchmarks for the concurrent map:  
 ```
-./bench.sh
-./test_race.sh
-./bench_trace.sh
+make map-bench
+make map-race-test
 ```  
