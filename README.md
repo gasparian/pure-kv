@@ -41,8 +41,8 @@ import (
 )
 
 func main() {
-    // creates client instance by providing server address and timetout in sec. 
-    cli, err := pkv.InitPureKvClient("0.0.0.0:6666", uint(30))
+    // creates client instance by providing server address and timetout in ms. 
+    cli, err := pkv.InitPureKvClient("0.0.0.0:6666", uint(500))
     defer cli.Close() 
     if err != nil {
         log.Fatal(err)

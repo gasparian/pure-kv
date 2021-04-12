@@ -30,9 +30,9 @@ func prepareServer(t *testing.T) func() error {
 func TestClient(t *testing.T) {
 	defer os.RemoveAll(path)
 	defer prepareServer(t)()
-	time.Sleep(5 * time.Second) // just wait for server to be started
+	time.Sleep(1 * time.Second) // just wait for server to be started
 
-	cli, err := InitPureKvClient("0.0.0.0:6668", uint(5))
+	cli, err := InitPureKvClient("0.0.0.0:6668", uint(500))
 	if err != nil {
 		t.Fatal(err)
 	}
