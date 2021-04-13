@@ -15,6 +15,11 @@ const (
 	path = "/tmp/pure-kv-db-client-test"
 )
 
+type SomeCustomType struct {
+	Key   string
+	Value map[string]bool
+}
+
 func prepareServer(t *testing.T) func() error {
 	srv := server.InitServer(
 		6668, // port
@@ -27,7 +32,37 @@ func prepareServer(t *testing.T) func() error {
 	return srv.Close
 }
 
+func TestSerializers(t *testing.T) {
+	t.Parallel()
+	emptyObj := &SomeCustomType{}
+	origObj := &SomeCustomType{
+		Key: "key",
+		Value: map[string]bool{
+			"a": true,
+		},
+	}
+	duplicateObj := &SomeCustomType{}
+
+	serializedEmpty, err := Serialize(emptyObj)
+	serialized, err := Serialize(origObj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(serialized) == len(serializedEmpty) {
+		t.Fatal("Serialized object can't be equal to serialized empty struct")
+	}
+
+	err = Deserialize(serialized, duplicateObj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if duplicateObj.Key != origObj.Key || len(duplicateObj.Value) != len(origObj.Value) {
+		t.Fatal("Desirialized object must be equal to the original one")
+	}
+}
+
 func TestClient(t *testing.T) {
+	t.Parallel()
 	defer os.RemoveAll(path)
 	defer prepareServer(t)()
 	time.Sleep(1 * time.Second) // just wait for server to be started

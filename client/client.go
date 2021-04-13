@@ -1,8 +1,10 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/gob"
 	"errors"
 	"github.com/gasparian/pure-kv-go/core"
 	"net/rpc"
@@ -21,6 +23,29 @@ var (
 type Client struct {
 	client  *rpc.Client
 	timeout time.Duration
+}
+
+// Serialize dumps object to byte array via gob encoder
+func Serialize(obj interface{}) ([]byte, error) {
+	buf := &bytes.Buffer{}
+	enc := gob.NewEncoder(buf)
+	err := enc.Encode(obj)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// Deserialize decodes recieved gob encoded data and writes to input object by reference
+func Deserialize(inp []byte, obj interface{}) error {
+	buf := &bytes.Buffer{}
+	buf.Write(inp)
+	dec := gob.NewDecoder(buf)
+	err := dec.Decode(obj)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // InitPureKvClient returns initialized rpc client

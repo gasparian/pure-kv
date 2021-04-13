@@ -39,6 +39,11 @@ import (
     "log"
     pkv "github.com/gasparian/pure-kv-go/client"
 )
+ 
+type SomeCustomType struct {
+	Key   string
+	Value map[string]bool
+}
 
 func main() {
     // creates client instance by providing server address and timetout in ms. 
@@ -57,12 +62,34 @@ func main() {
     if err != nil {
         log.Fatal(err)
     }
+    // you can use provided function for serializing any struct
+	obj := &SomeCustomType{
+		Key: "key",
+		Value: map[string]bool{
+			"a": true,
+		},
+	}
+    serialized, err := Serialize(obj)
+    if err != nil {
+        log.Fatal(err)
+    }
+    err = cli.Set("BucketName", "someKey", serialized) 
+    if err != nil {
+        log.Fatal(err)
+    }
     // returns decoded value
     val, ok := cli.Get("BucketName", "someKey") 
     if !ok {
         log.Fatal("Can't get a value")
     }    
     log.Println(val)
+    // or you can desirialize byte array to fill the struct
+    duplicateObj := &SomeCustomType{}
+	err = Deserialize(val, duplicateObj)
+    if err != nil {
+        log.Fatal(err)
+    }
+    log.Println(obj, duplicateObj)
     // returns size of specified bucket
     bucketSize, err := cli.Size("BucketName") 
     if err != nil {
