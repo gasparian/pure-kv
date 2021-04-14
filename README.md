@@ -65,12 +65,12 @@ func main() {
         log.Fatal(err)
     }
     // you can use provided function for serializing any struct
-	obj := &SomeCustomType{
-		Key: "key",
-		Value: map[string]bool{
-			"a": true,
-		},
-	}
+    obj := &SomeCustomType{
+        Key: "key",
+        Value: map[string]bool{
+            "a": true,
+        },
+    }
     serialized, err := Serialize(obj)
     if err != nil {
         log.Fatal(err)
@@ -87,7 +87,7 @@ func main() {
     log.Println(val)
     // or you can desirialize byte array to fill the struct
     duplicateObj := &SomeCustomType{}
-	err = Deserialize(val, duplicateObj)
+    err = Deserialize(val, duplicateObj)
     if err != nil {
         log.Fatal(err)
     }
