@@ -50,11 +50,9 @@ func Deserialize(inp []byte, obj interface{}) error {
 }
 
 // New instantiates the rpc client
-func New(address string, timeout int) *Client {
-	return &Client{
-		address: address,
-		timeout: time.Duration(timeout) * time.Millisecond,
-	}
+func (c *Client) New(address string, timeout int) {
+	c.address = address
+	c.timeout = time.Duration(timeout) * time.Millisecond
 }
 
 // Open creates connection to the rpc server
