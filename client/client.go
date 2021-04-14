@@ -23,6 +23,7 @@ var (
 type Client struct {
 	client  *rpc.Client
 	timeout time.Duration
+	address string
 }
 
 // Serialize dumps object to byte array via gob encoder
@@ -48,17 +49,22 @@ func Deserialize(inp []byte, obj interface{}) error {
 	return nil
 }
 
-// InitPureKvClient returns initialized rpc client
-func InitPureKvClient(address string, timeout uint) (*Client, error) {
-	c, err := rpc.Dial("tcp", address)
-	if err != nil {
-		return nil, err
-	}
-	pureKvClient := &Client{
-		client:  c,
+// New instantiates the rpc client
+func New(address string, timeout int) *Client {
+	return &Client{
+		address: address,
 		timeout: time.Duration(timeout) * time.Millisecond,
 	}
-	return pureKvClient, nil
+}
+
+// Open creates connection to the rpc server
+func (c *Client) Open() error {
+	client, err := rpc.Dial("tcp", c.address)
+	if err != nil {
+		return err
+	}
+	c.client = client
+	return nil
 }
 
 // Close terminates the underlying client
