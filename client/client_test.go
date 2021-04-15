@@ -67,8 +67,7 @@ func TestClient(t *testing.T) {
 	defer prepareServer(t)()
 	time.Sleep(1 * time.Second) // just wait for server to be started
 
-	cli := &Client{}
-	cli.New("0.0.0.0:6668", 500)
+	cli := New("0.0.0.0:6668", 500)
 	err := cli.Open()
 	if err != nil {
 		t.Fatal(err)
