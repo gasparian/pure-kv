@@ -47,7 +47,7 @@ type SomeCustomType struct {
 
 func main() {
     // creates client instance by providing server address and timetout in ms. 
-    cli := New("0.0.0.0:6668", 500)
+    cli := pkv.New("0.0.0.0:6668", 500)
     err := cli.Open()
     defer cli.Close() 
     if err != nil {
