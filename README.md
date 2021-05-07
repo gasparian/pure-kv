@@ -8,7 +8,7 @@ Simple and fast in-memory key-value storage with RPC interface, written in go.
 
 Features:  
  * uses RPC interface;  
- * uses concurrency-efficient map;  
+ * uses concurrency-efficient map (in the end, my implementation becomes pretty similar to [this one](https://github.com/orcaman/concurrent-map), but a bit simpler, I think);  
  * stores objects as empty interfaces;  
  * supports buckets so you can organize your storage better;  
  * supports iteration over buckets' contence;  
