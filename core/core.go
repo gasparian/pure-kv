@@ -23,7 +23,7 @@ const (
 // Record holds all needed data for each map entry
 type Record struct {
 	Key   string
-	Value []byte
+	Value interface{}
 }
 
 // Response holds binary value from server and status

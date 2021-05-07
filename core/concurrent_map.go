@@ -21,8 +21,8 @@ var (
 // ConcurrentMap holds a slice of maps' pointers
 type ConcurrentMap []*MapShard
 
-// Records is just alias for map of byte-arrays
-type Records map[string][]byte
+// Records is just alias for map of empty interfaces
+type Records map[string]interface{}
 
 // MapShard is just as regular map but with embedded mutex
 type MapShard struct {
@@ -146,7 +146,7 @@ func (m ConcurrentMap) Size(bucketName string) (uint64, error) {
 }
 
 // Set places value in the needed shard by string key
-func (m ConcurrentMap) Set(bucketName, key string, value []byte) error {
+func (m ConcurrentMap) Set(bucketName, key string, value interface{}) error {
 	shard := m.getShard(key)
 	shard.mutex.Lock()
 	bucket, ok := shard.Items[bucketName]
@@ -159,7 +159,7 @@ func (m ConcurrentMap) Set(bucketName, key string, value []byte) error {
 }
 
 // Get returns value by string key
-func (m ConcurrentMap) Get(bucketName, key string) ([]byte, bool) {
+func (m ConcurrentMap) Get(bucketName, key string) (interface{}, bool) {
 	shard := m.getShard(key)
 	shard.mutex.RLock()
 	bucket, ok := shard.Items[bucketName]

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/binary"
 	"github.com/gasparian/pure-kv-go/core"
 	"net/rpc"
 	"os"
@@ -85,7 +84,7 @@ func TestServer(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		size := binary.LittleEndian.Uint64(resp.Value)
+		size := resp.Value.(uint64)
 		if size != 1 {
 			t.Error("Must contain a single element")
 		}

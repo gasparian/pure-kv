@@ -9,7 +9,7 @@ Simple and fast in-memory key-value storage with RPC interface, written in go.
 Features:  
  * uses RPC interface;  
  * uses concurrency-efficient map;  
- * stores byte arrays only;  
+ * stores objects as empty interfaces;  
  * supports buckets so you can organize your storage better;  
  * supports iteration over buckets' contence;  
  * persistant by default;  
@@ -39,11 +39,6 @@ import (
     "log"
     pkv "github.com/gasparian/pure-kv-go/client"
 )
- 
-type SomeCustomType struct {
-	Key   string
-	Value map[string]bool
-}
 
 func main() {
     // creates client instance by providing server address and timetout in ms. 
@@ -63,34 +58,14 @@ func main() {
     if err != nil {
         log.Fatal(err)
     }
-    // you can use provided function for serializing any struct
-    obj := &SomeCustomType{
-        Key: "key",
-        Value: map[string]bool{
-            "a": true,
-        },
-    }
-    serialized, err := Serialize(obj)
-    if err != nil {
-        log.Fatal(err)
-    }
-    err = cli.Set("BucketName", "someKey", serialized) 
-    if err != nil {
-        log.Fatal(err)
-    }
-    // returns decoded value
-    val, ok := cli.Get("BucketName", "someKey") 
+    // returns value
+    tmpVal, ok := cli.Get("BucketName", "someKey") 
+    // cast back to original type
+    val := tmpVal.([]byte) 
     if !ok {
         log.Fatal("Can't get a value")
     }    
     log.Println(val)
-    // or you can desirialize byte array to fill the struct
-    duplicateObj := &SomeCustomType{}
-    err = Deserialize(val, duplicateObj)
-    if err != nil {
-        log.Fatal(err)
-    }
-    log.Println(obj, duplicateObj)
     // returns size of specified bucket
     bucketSize, err := cli.Size("BucketName") 
     if err != nil {
@@ -108,6 +83,12 @@ func main() {
         log.Fatal(err)
     }
     log.Println(k, val)
+    // returns total number of records in storage
+    size, err := cli.Size("")
+    if err != nil {
+        log.Fatal(err)
+    }
+    log.Println(size)
     // async. delete value from the bucket
     err = cli.Del("BucketName", "someKey") 
     if err != nil {
@@ -118,12 +99,6 @@ func main() {
     if err != nil {
         log.Fatal(err)
     }
-    // returns total number of records in storage
-    size, err := cli.Size("")
-    if err != nil {
-        log.Fatal(err)
-    }
-    log.Println(size)
 }
 ```  
 

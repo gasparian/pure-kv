@@ -3,7 +3,6 @@ package client
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"encoding/gob"
 	"errors"
 	"github.com/gasparian/pure-kv-go/core"
@@ -115,7 +114,7 @@ func (c *Client) Size(bucketName string) (uint64, error) {
 	if resp == nil {
 		return 0, errCantGetSize
 	}
-	size := binary.LittleEndian.Uint64(resp.Value)
+	size := resp.Value.(uint64)
 	return size, nil
 }
 
@@ -165,7 +164,7 @@ func (c *Client) Del(bucketName, key string) error {
 }
 
 // Set makes RPC for creating the new key value pair in specified bucket
-func (c *Client) Set(bucketName, key string, val []byte) error {
+func (c *Client) Set(bucketName, key string, val interface{}) error {
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 	request := &core.Request{
@@ -183,7 +182,7 @@ func (c *Client) Set(bucketName, key string, val []byte) error {
 }
 
 // Get makes RPC that returns value by key from one of the buckets
-func (c *Client) Get(bucketName, key string) ([]byte, bool) {
+func (c *Client) Get(bucketName, key string) (interface{}, bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 	request := &core.Request{
@@ -214,7 +213,7 @@ func (c *Client) MakeIterator(bucketName string) error {
 }
 
 // Next makes RPC that returns the next key-value pair according to the iterator state
-func (c *Client) Next(bucketName string) (string, []byte, error) {
+func (c *Client) Next(bucketName string) (string, interface{}, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 	request := &core.Request{

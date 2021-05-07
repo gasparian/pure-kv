@@ -2,7 +2,6 @@ package core
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"os"
 	"strconv"
@@ -70,10 +69,11 @@ func TestSetGet(t *testing.T) {
 	})
 
 	t.Run("GetKey", func(t *testing.T) {
-		valGet, ok := m.Get(bucketName, key)
+		tmpVal, ok := m.Get(bucketName, key)
 		if !ok {
 			t.Error("Key should exist")
 		}
+		valGet := tmpVal.([]byte)
 		res := bytes.Compare(val, valGet)
 		if res != 0 {
 			t.Error("Values should be equal")
@@ -233,7 +233,7 @@ func TestPureKvBuckets(t *testing.T) {
 	t.Run("Size", func(t *testing.T) {
 		resp := &Response{}
 		err := pkv.Size(req, resp)
-		size := binary.LittleEndian.Uint64(resp.Value)
+		size := resp.Value.(uint64)
 		if !resp.Ok || err != nil || size != 0 {
 			t.Error("Bucket must be empty")
 		}
@@ -245,7 +245,8 @@ func TestPureKvSetGet(t *testing.T) {
 	pkv := NewPureKv(32)
 	req := Request{Bucket: "test"}
 	req.Key = "key"
-	req.Value = []byte{'a'}
+	val := []byte{'a'}
+	req.Value = val
 	resp := &Response{}
 	pkv.Create(req, resp)
 
@@ -262,7 +263,8 @@ func TestPureKvSetGet(t *testing.T) {
 		if !resp.Ok || err != nil {
 			t.Errorf("Can't get the value: %v", err)
 		}
-		if bytes.Compare(resp.Value, req.Value) != 0 {
+		respVal := resp.Value.([]byte)
+		if bytes.Compare(respVal, val) != 0 {
 			t.Error("Value is not valid")
 		}
 	})
@@ -270,7 +272,7 @@ func TestPureKvSetGet(t *testing.T) {
 	t.Run("Size", func(t *testing.T) {
 		resp := &Response{}
 		err := pkv.Size(req, resp)
-		size := binary.LittleEndian.Uint64(resp.Value)
+		size := resp.Value.(uint64)
 		if !resp.Ok || err != nil || size != 1 {
 			t.Error("Map must contain a single object")
 		}

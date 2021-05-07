@@ -1,7 +1,6 @@
 package core
 
 import (
-	"encoding/binary"
 	"errors"
 	"sync"
 )
@@ -37,9 +36,7 @@ func (kv *PureKv) Size(req Request, res *Response) error {
 	if err != nil {
 		return err
 	}
-	b := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b, val)
-	res.Value = b
+	res.Value = val
 	res.Ok = true
 	return nil
 }

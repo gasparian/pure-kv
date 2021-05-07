@@ -130,7 +130,8 @@ func TestClient(t *testing.T) {
 	})
 
 	t.Run("GetVal", func(t *testing.T) {
-		val, ok := cli.Get(bucketName, keys[0])
+		tmpVal, ok := cli.Get(bucketName, keys[0])
+		val := tmpVal.([]byte)
 		if !ok || bytes.Compare(val, valSet) != 0 {
 			t.Error("Can't get the value from map")
 		}
@@ -144,7 +145,8 @@ func TestClient(t *testing.T) {
 			for i := 0; i < 10; i++ {
 				go func() {
 					defer wg.Done()
-					val, ok := cli.Get(bucketName, keys[0])
+					tmpVal, ok := cli.Get(bucketName, keys[0])
+					val := tmpVal.([]byte)
 					if !ok || bytes.Compare(val, valSet) != 0 {
 						errs <- errors.New("Can't get the value from map")
 						return
@@ -171,7 +173,8 @@ func TestClient(t *testing.T) {
 
 	t.Run("GetNext", func(t *testing.T) {
 		for range keys {
-			_, val, err := cli.Next(bucketName)
+			_, tmpVal, err := cli.Next(bucketName)
+			val := tmpVal.([]byte)
 			if err != nil || bytes.Compare(val, valSet) != 0 {
 				t.Error("Can't get the value from map iterator")
 			}
