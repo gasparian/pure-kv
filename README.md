@@ -60,7 +60,7 @@ func main() {
     }
     // returns value
     tmpVal, ok := cli.Get("BucketName", "someKey") 
-    // cast back to original type
+    // you cast the result back to original type
     val := tmpVal.([]byte) 
     if !ok {
         log.Fatal("Can't get a value")
@@ -78,11 +78,11 @@ func main() {
         log.Fatal(err)
     }
     // get next element of bucket
-    k, val, err := cli.Next("BucketName") 
+    k, tmpVal, err := cli.Next("BucketName") 
     if err != nil {
         log.Fatal(err)
     }
-    log.Println(k, val)
+    log.Println(k, tmpVal)
     // returns total number of records in storage
     size, err := cli.Size("")
     if err != nil {
