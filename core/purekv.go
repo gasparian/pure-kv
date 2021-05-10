@@ -41,13 +41,16 @@ func (kv *PureKv) Size(req Request, res *Response) error {
 	return nil
 }
 
-// Create instantiates the new map
+// Create instantiates the new map (bucket)
 func (kv *PureKv) Create(req Request, res *Response) error {
 	if len(req.Bucket) == 0 {
 		return errBucketKeyMustBeDefined
 	}
 	buckets := kv.Buckets
-	buckets.SetBucket(req.Bucket)
+	has := buckets.HasBucket(req.Bucket)
+	if !has {
+		buckets.SetBucket(req.Bucket)
+	}
 	res.Ok = true
 	return nil
 }
