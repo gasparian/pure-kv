@@ -16,6 +16,7 @@ var (
 	errCantDeleteBucket    = errors.New("unable to delete the bucket")
 	errCantDeleteKey       = errors.New("unable to delete key")
 	errCantSetKeyValuePair = errors.New("unable to set the key-value pair")
+	errCantGetValue        = errors.New("unable to get the value")
 )
 
 // Client holds client connection
@@ -221,7 +222,7 @@ func (c *Client) Next(bucketName string) (string, interface{}, error) {
 	}
 	resp := c.executeWrapper(ctx, core.Next, request)
 	if resp == nil {
-		return "", nil, errCantSetKeyValuePair
+		return "", nil, errCantGetValue
 	}
 	return resp.Key, resp.Value, nil
 }
