@@ -222,11 +222,21 @@ func TestPureKvBuckets(t *testing.T) {
 		}
 	})
 
+	t.Run("DestroyAll", func(t *testing.T) {
+		pkv.Create(req, &Response{})
+		resp := &Response{}
+		err := pkv.DestroyAll(req, resp)
+		time.Sleep(250 * time.Millisecond)
+		if !resp.Ok || err != nil {
+			t.Errorf("Bucket has not been deleted: %v", err)
+		}
+	})
+
 	t.Run("MakeIterator", func(t *testing.T) {
 		resp := &Response{}
 		err := pkv.MakeIterator(req, resp)
 		if !(!resp.Ok && err != nil) {
-			t.Error("Bucket must not exist yet!")
+			t.Error("Bucket must not be exist yet!")
 		}
 	})
 

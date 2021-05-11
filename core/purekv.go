@@ -13,26 +13,29 @@ var (
 
 type mapIterators struct {
 	sync.RWMutex
-	Items map[string]chan string
+	items map[string]chan string
 }
 
 // PureKv main structure for holding maps and key iterators
 type PureKv struct {
-	Iterators *mapIterators
-	Buckets   ConcurrentMap
+	mx           sync.Mutex
+	shardsNumber int
+	iterators    *mapIterators
+	buckets      ConcurrentMap
 }
 
 // NewPureKv instantiates the new PureKv object
 func NewPureKv(shardsNumber int) *PureKv {
 	return &PureKv{
-		Iterators: &mapIterators{Items: make(map[string]chan string)},
-		Buckets:   NewMap(shardsNumber),
+		shardsNumber: shardsNumber,
+		iterators:    &mapIterators{items: make(map[string]chan string)},
+		buckets:      NewMap(shardsNumber),
 	}
 }
 
 // Size calcaulates total number of instances in the map
 func (kv *PureKv) Size(req Request, res *Response) error {
-	val, err := kv.Buckets.Size(req.Bucket)
+	val, err := kv.buckets.Size(req.Bucket)
 	if err != nil {
 		return err
 	}
@@ -46,7 +49,7 @@ func (kv *PureKv) Create(req Request, res *Response) error {
 	if len(req.Bucket) == 0 {
 		return errBucketKeyMustBeDefined
 	}
-	buckets := kv.Buckets
+	buckets := kv.buckets
 	has := buckets.HasBucket(req.Bucket)
 	if !has {
 		buckets.SetBucket(req.Bucket)
@@ -55,21 +58,31 @@ func (kv *PureKv) Create(req Request, res *Response) error {
 	return nil
 }
 
-// Destroy drops the entire bucket
+// Destroy drops the bucket
 func (kv *PureKv) Destroy(req Request, res *Response) error {
 	if len(req.Bucket) == 0 {
 		return errBucketKeyMustBeDefined
 	}
-	buckets := kv.Buckets
-	iterators := kv.Iterators
+	buckets := kv.buckets
+	iterators := kv.iterators
 	go func() {
 		buckets.DelBucket(req.Bucket)
 	}()
 	go func() {
 		iterators.Lock()
-		delete(iterators.Items, req.Bucket)
+		delete(iterators.items, req.Bucket)
 		iterators.Unlock()
 	}()
+	res.Ok = true
+	return nil
+}
+
+// DestroyAll drops the entire db
+func (kv *PureKv) DestroyAll(req Request, res *Response) error {
+	kv.mx.Lock()
+	kv.iterators = &mapIterators{items: make(map[string]chan string)}
+	kv.buckets = NewMap(kv.shardsNumber)
+	kv.mx.Unlock()
 	res.Ok = true
 	return nil
 }
@@ -79,7 +92,7 @@ func (kv *PureKv) Del(req Request, res *Response) error {
 	if len(req.Bucket) == 0 {
 		return errBucketKeyMustBeDefined
 	}
-	buckets := kv.Buckets
+	buckets := kv.buckets
 	go func() {
 		buckets.Del(req.Bucket, req.Key)
 	}()
@@ -92,7 +105,7 @@ func (kv *PureKv) Set(req Request, res *Response) error {
 	if len(req.Bucket) == 0 {
 		return errBucketKeyMustBeDefined
 	}
-	buckets := kv.Buckets
+	buckets := kv.buckets
 	buckets.Set(req.Bucket, req.Key, req.Value)
 	res.Ok = true
 	return nil
@@ -103,7 +116,7 @@ func (kv *PureKv) Get(req Request, res *Response) error {
 	if len(req.Bucket) == 0 {
 		return errBucketKeyMustBeDefined
 	}
-	buckets := kv.Buckets
+	buckets := kv.buckets
 	val, ok := buckets.Get(req.Bucket, req.Key)
 	if !ok {
 		return errBucketCantBeFound
@@ -118,14 +131,14 @@ func (kv *PureKv) MakeIterator(req Request, res *Response) error {
 	if len(req.Bucket) == 0 {
 		return errBucketKeyMustBeDefined
 	}
-	buckets := kv.Buckets
+	buckets := kv.buckets
 	has := buckets.HasBucket(req.Bucket)
 	if !has {
 		return errBucketCantBeFound
 	}
-	iterators := kv.Iterators
+	iterators := kv.iterators
 	iterators.Lock()
-	iterators.Items[req.Bucket] = buckets.MapKeysIterator(req.Bucket)
+	iterators.items[req.Bucket] = buckets.MapKeysIterator(req.Bucket)
 	iterators.Unlock()
 	res.Ok = true
 	return nil
@@ -136,17 +149,17 @@ func (kv *PureKv) Next(req Request, res *Response) error {
 	if len(req.Bucket) == 0 {
 		return errBucketKeyMustBeDefined
 	}
-	buckets := kv.Buckets
-	iterators := kv.Iterators
+	buckets := kv.buckets
+	iterators := kv.iterators
 	has := buckets.HasBucket(req.Bucket)
 	if !has {
 		return errBucketCantBeFound
 	}
 	iterators.Lock()
-	key, open := <-iterators.Items[req.Bucket]
+	key, open := <-iterators.items[req.Bucket]
 	if !open {
 		go func() {
-			delete(iterators.Items, req.Bucket)
+			delete(iterators.items, req.Bucket)
 			iterators.Unlock()
 		}()
 		return nil
@@ -160,4 +173,14 @@ func (kv *PureKv) Next(req Request, res *Response) error {
 	}
 	res.Ok = true
 	return nil
+}
+
+// Dump ...
+func (kv *PureKv) Dump(dbPath string) error {
+	return kv.buckets.Dump(dbPath)
+}
+
+// Load ...
+func (kv *PureKv) Load(dbPath string) error {
+	return kv.buckets.Load(dbPath)
 }

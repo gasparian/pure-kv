@@ -8,14 +8,15 @@ import (
 
 // Shortcuts for RPC methods
 const (
-	Size     = "PureKv.Size"
-	Create   = "PureKv.Create"
-	Destroy  = "PureKv.Destroy"
-	Del      = "PureKv.Del"
-	Set      = "PureKv.Set"
-	Get      = "PureKv.Get"
-	MakeIter = "PureKv.MakeIterator"
-	Next     = "PureKv.Next"
+	Size       = "PureKv.Size"
+	Create     = "PureKv.Create"
+	Destroy    = "PureKv.Destroy"
+	DestroyAll = "PureKv.DestroyAll"
+	Del        = "PureKv.Del"
+	Set        = "PureKv.Set"
+	Get        = "PureKv.Get"
+	MakeIter   = "PureKv.MakeIterator"
+	Next       = "PureKv.Next"
 	// Default files creation mode
 	FileMode = 0700
 )

@@ -147,6 +147,17 @@ func (c *Client) Destroy(bucketName string) error {
 	return nil
 }
 
+// DestroyAll makes RPC for deleting entire db
+func (c *Client) DestroyAll() error {
+	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
+	defer cancel()
+	resp := c.executeWrapper(ctx, core.DestroyAll, &core.Request{})
+	if resp == nil {
+		return errCantDeleteBucket
+	}
+	return nil
+}
+
 // Del makes RPC for droping any record from the bucket by a given key
 func (c *Client) Del(bucketName, key string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)

@@ -46,13 +46,13 @@ func (s *Server) Close() error {
 
 // loadDb loads db using specified path
 func (s *Server) loadDb() error {
-	return s.db.Buckets.Load(s.DbPath)
+	return s.db.Load(s.DbPath)
 }
 
 // persist dumps db on disk periodically
 func (s *Server) persist() {
 	for atomic.LoadUint32(&s.closed) == 0 {
-		err := s.db.Buckets.Dump(s.DbPath)
+		err := s.db.Dump(s.DbPath)
 		if err != nil {
 			panic(err)
 		}

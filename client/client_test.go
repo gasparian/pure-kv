@@ -179,6 +179,10 @@ func TestClient(t *testing.T) {
 				t.Error("Can't get the value from map iterator")
 			}
 		}
+		_, tmpVal, _ := cli.Next(bucketName)
+		if tmpVal != nil {
+			t.Error("Iterator must be closed")
+		}
 	})
 
 	t.Run("CheckPersistance", func(t *testing.T) {
@@ -197,9 +201,6 @@ func TestClient(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-	})
-
-	t.Run("GetValAfterDel", func(t *testing.T) {
 		time.Sleep(250 * time.Millisecond)
 		_, ok := cli.Get(bucketName, keys[0])
 		if ok {
@@ -207,16 +208,27 @@ func TestClient(t *testing.T) {
 		}
 	})
 
-	t.Run("DeleteBucket", func(t *testing.T) {
+	t.Run("Destroy", func(t *testing.T) {
 		err = cli.Destroy(bucketName)
 		if err != nil {
 			t.Error(err)
 		}
-	})
-
-	t.Run("GetValAfterDestroy", func(t *testing.T) {
 		time.Sleep(250 * time.Millisecond)
 		_, ok := cli.Get(bucketName, keys[1])
+		if ok {
+			t.Error("Value should be deleted")
+		}
+	})
+
+	t.Run("DestroyAll", func(t *testing.T) {
+		cli.Create(bucketName)
+		cli.Set(bucketName, keys[0], valSet)
+		err = cli.DestroyAll()
+		if err != nil {
+			t.Error(err)
+		}
+		time.Sleep(250 * time.Millisecond)
+		_, ok := cli.Get(bucketName, keys[0])
 		if ok {
 			t.Error("Value should be deleted")
 		}

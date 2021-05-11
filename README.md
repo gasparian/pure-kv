@@ -99,6 +99,8 @@ func main() {
     if err != nil {
         log.Fatal(err)
     }
+    // recreates the entire db, deleting everything
+    cli.DestroyAll() 
 }
 ```  
 
