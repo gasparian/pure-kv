@@ -32,6 +32,9 @@ type MapShard struct {
 
 // Serialize encodes shard as a byte array
 func (s *MapShard) Serialize() ([]byte, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
 	buf := &bytes.Buffer{}
 	enc := gob.NewEncoder(buf)
 	err := enc.Encode(s)
@@ -43,6 +46,9 @@ func (s *MapShard) Serialize() ([]byte, error) {
 
 // Deserialize converts byte array to shard
 func (s *MapShard) Deserialize(inp []byte) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
 	buf := &bytes.Buffer{}
 	buf.Write(inp)
 	dec := gob.NewDecoder(buf)
@@ -117,10 +123,10 @@ func (m ConcurrentMap) getShard(key string) *MapShard {
 func (m ConcurrentMap) SetBucket(bucketName string) {
 	m.iterShard(
 		func(idx int, sh *MapShard, wg *sync.WaitGroup, errs chan error) {
+			defer wg.Done()
 			sh.mutex.Lock()
+			defer sh.mutex.Unlock()
 			sh.Items[bucketName] = make(Records)
-			sh.mutex.Unlock()
-			wg.Done()
 		},
 	)
 }
@@ -130,7 +136,9 @@ func (m ConcurrentMap) Size(bucketName string) (uint64, error) {
 	var size uint64 = 0
 	err := m.iterShard(
 		func(idx int, sh *MapShard, wg *sync.WaitGroup, errs chan error) {
+			defer wg.Done()
 			sh.mutex.RLock()
+			defer sh.mutex.RUnlock()
 			if len(bucketName) == 0 {
 				for _, v := range sh.Items {
 					atomic.AddUint64(&size, uint64(len(v)))
@@ -138,8 +146,6 @@ func (m ConcurrentMap) Size(bucketName string) (uint64, error) {
 			} else {
 				atomic.AddUint64(&size, uint64(len(sh.Items[bucketName])))
 			}
-			sh.mutex.RUnlock()
-			wg.Done()
 		},
 	)
 	return size, err
@@ -211,13 +217,13 @@ func (m ConcurrentMap) Del(bucketName, key string) {
 func (m ConcurrentMap) DelBucket(bucketName string) {
 	m.iterShard(
 		func(idx int, sh *MapShard, wg *sync.WaitGroup, errs chan error) {
+			defer wg.Done()
 			sh.mutex.Lock()
+			defer sh.mutex.Unlock()
 			_, ok := sh.Items[bucketName]
 			if ok {
 				delete(sh.Items, bucketName)
 			}
-			sh.mutex.Unlock()
-			wg.Done()
 		},
 	)
 }
@@ -272,11 +278,11 @@ func (m ConcurrentMap) Dump(path string) error {
 	os.MkdirAll(path, FileMode)
 	err := m.iterShard(
 		func(idx int, sh *MapShard, wg *sync.WaitGroup, errs chan error) {
+			defer wg.Done()
 			sh.mutex.RLock()
+			defer sh.mutex.RUnlock()
 			fpath := filepath.Join(path, strconv.Itoa(idx))
 			errs <- sh.Save(fpath)
-			sh.mutex.RUnlock()
-			wg.Done()
 		},
 	)
 	if err != nil {
@@ -289,11 +295,11 @@ func (m ConcurrentMap) Dump(path string) error {
 func (m ConcurrentMap) Load(path string) error {
 	err := m.iterShard(
 		func(idx int, sh *MapShard, wg *sync.WaitGroup, errs chan error) {
+			defer wg.Done()
 			sh.mutex.Lock()
+			defer sh.mutex.Unlock()
 			sh.Items = make(map[string]Records)
 			errs <- sh.Load(filepath.Join(path, strconv.Itoa(idx)))
-			sh.mutex.Unlock()
-			wg.Done()
 		},
 	)
 	if err != nil {
