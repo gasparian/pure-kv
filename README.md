@@ -1,10 +1,10 @@
-![main build](https://github.com/gasparian/pure-kv-go/actions/workflows/build.yml/badge.svg?branch=main)
-![main tests](https://github.com/gasparian/pure-kv-go/actions/workflows/test.yml/badge.svg?branch=main)
+![main build](https://github.com/gasparian/pure-kv/actions/workflows/build.yml/badge.svg?branch=main)
+![main tests](https://github.com/gasparian/pure-kv/actions/workflows/test.yml/badge.svg?branch=main)
 
-# pure-kv-go  
+# pure-kv  
 Simple and fast in-memory key-value storage with RPC interface.  
 
-<p align="center"> <img src="https://github.com/gasparian/pure-kv-go/blob/main/pics/logo.jpg" height=300/> </p>  
+<p align="center"> <img src="https://github.com/gasparian/pure-kv/blob/main/pics/logo.jpg" height=300/> </p>  
 
 Features:  
  * uses RPC interface;  
@@ -17,7 +17,7 @@ Features:
 
 ### Install  
 ```
-go get github.com/gasparian/pure-kv-go
+go get github.com/gasparian/pure-kv
 ```  
 
 ### Run server  
@@ -37,7 +37,7 @@ package main
 
 import (
     "log"
-    pkv "github.com/gasparian/pure-kv-go/client"
+    pkv "github.com/gasparian/pure-kv/client"
 )
 
 func main() {
@@ -104,12 +104,12 @@ func main() {
 }
 ```  
 
-[Server:](https://github.com/gasparian/pure-kv-go/blob/main/main.go)  
+[Server:](https://github.com/gasparian/pure-kv/blob/main/main.go)  
 ```go
 package main
 
 import (
-    pkv "github.com/gasparian/pure-kv-go/server"
+    pkv "github.com/gasparian/pure-kv/server"
 )
 
 func main() {

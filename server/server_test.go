@@ -1,7 +1,7 @@
 package server
 
 import (
-	"github.com/gasparian/pure-kv-go/core"
+	"github.com/gasparian/pure-kv/core"
 	"net/rpc"
 	"os"
 	"testing"

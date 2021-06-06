@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/gob"
 	"errors"
-	"github.com/gasparian/pure-kv-go/core"
+	"github.com/gasparian/pure-kv/core"
 	"net/rpc"
 	"time"
 )

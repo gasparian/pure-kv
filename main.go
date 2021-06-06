@@ -4,7 +4,7 @@ package main
 
 import (
 	"flag"
-	"github.com/gasparian/pure-kv-go/server"
+	"github.com/gasparian/pure-kv/server"
 )
 
 var (
