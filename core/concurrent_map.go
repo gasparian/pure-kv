@@ -156,12 +156,13 @@ func (m ConcurrentMap) Size(bucketName string) (uint64, error) {
 func (m ConcurrentMap) Set(bucketName, key string, value interface{}) error {
 	shard := m.getShard(key)
 	shard.mutex.Lock()
+	defer shard.mutex.Unlock()
+
 	bucket, ok := shard.Items[bucketName]
 	if !ok {
 		return errBucketCantBeFound
 	}
 	bucket[key] = value
-	shard.mutex.Unlock()
 	return nil
 }
 
@@ -169,20 +170,22 @@ func (m ConcurrentMap) Set(bucketName, key string, value interface{}) error {
 func (m ConcurrentMap) Get(bucketName, key string) (interface{}, bool) {
 	shard := m.getShard(key)
 	shard.mutex.RLock()
+	defer shard.mutex.RUnlock()
+
 	bucket, ok := shard.Items[bucketName]
 	if !ok {
 		return nil, false
 	}
 	val, ok := bucket[key]
-	shard.mutex.RUnlock()
 	return val, ok
 }
 
 // HasBucket checks that key exists in the map
 func (m ConcurrentMap) HasBucket(bucketName string) bool {
 	m[0].mutex.RLock()
+	defer m[0].mutex.RUnlock()
+
 	_, ok := m[0].Items[bucketName]
-	m[0].mutex.RUnlock()
 	if ok {
 		return ok
 	}
@@ -193,12 +196,13 @@ func (m ConcurrentMap) HasBucket(bucketName string) bool {
 func (m ConcurrentMap) Has(bucketName, key string) bool {
 	shard := m.getShard(key)
 	shard.mutex.RLock()
+	defer shard.mutex.RUnlock()
+
 	bucket, ok := shard.Items[bucketName]
 	if !ok {
 		return false
 	}
 	_, ok = bucket[key]
-	shard.mutex.RUnlock()
 	return ok
 }
 
@@ -206,12 +210,13 @@ func (m ConcurrentMap) Has(bucketName, key string) bool {
 func (m ConcurrentMap) Del(bucketName, key string) {
 	shard := m.getShard(key)
 	shard.mutex.Lock()
+	defer shard.mutex.Unlock()
+
 	bucket, ok := shard.Items[bucketName]
 	if !ok {
 		return
 	}
 	delete(bucket, key)
-	shard.mutex.Unlock()
 }
 
 // DelBucket drops bucket from every shard
@@ -237,15 +242,15 @@ func (m ConcurrentMap) MapKeysIterator(bucketName string) chan string {
 		wg.Add(len(m))
 		for _, shard := range m {
 			go func(sh *MapShard) {
+				defer wg.Done()
 				sh.mutex.RLock()
+				defer sh.mutex.RUnlock()
 				bucket, ok := sh.Items[bucketName]
 				if ok {
 					for k := range bucket {
 						ch <- k
 					}
 				}
-				sh.mutex.RUnlock()
-				wg.Done()
 			}(shard)
 		}
 		wg.Wait()

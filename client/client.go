@@ -7,6 +7,7 @@ import (
 	"errors"
 	"github.com/gasparian/pure-kv/core"
 	"net/rpc"
+	"sync"
 	"time"
 )
 
@@ -21,6 +22,7 @@ var (
 
 // Client holds client connection
 type Client struct {
+	mx      sync.RWMutex
 	client  *rpc.Client
 	timeout time.Duration
 	address string
@@ -80,7 +82,7 @@ func (c *Client) Close() error {
 func (c *Client) execute(methodName string, req *core.Request) chan *core.Response {
 	respChan := make(chan *core.Response)
 	go func() {
-		var response = new(core.Response)
+		response := new(core.Response)
 		err := c.client.Call(methodName, req, response)
 		if err == nil {
 			response.Ok = true
@@ -91,28 +93,25 @@ func (c *Client) execute(methodName string, req *core.Request) chan *core.Respon
 }
 
 // executeWrapper wraps execute function into context
-func (c *Client) executeWrapper(ctx context.Context, methodName string, req *core.Request) *core.Response {
+func (c *Client) executeWrapper(methodName string, req *core.Request) *core.Response {
+	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
+	defer cancel()
 	respChan := c.execute(methodName, req)
 	select {
 	case <-ctx.Done():
-		return nil
+		return &core.Response{}
 	case response := <-respChan:
-		if !response.Ok {
-			return nil
-		}
 		return response
 	}
 }
 
 // Size requests number of elements in the storage
 func (c *Client) Size(bucketName string) (uint64, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
-	defer cancel()
 	request := &core.Request{
 		Bucket: bucketName,
 	}
-	resp := c.executeWrapper(ctx, core.Size, request)
-	if resp == nil {
+	resp := c.executeWrapper(core.Size, request)
+	if !resp.Ok {
 		return 0, errCantGetSize
 	}
 	size := resp.Value.(uint64)
@@ -121,13 +120,11 @@ func (c *Client) Size(bucketName string) (uint64, error) {
 
 // Create makes RPC for creating the new map on the server
 func (c *Client) Create(bucketName string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
-	defer cancel()
 	request := &core.Request{
 		Bucket: bucketName,
 	}
-	resp := c.executeWrapper(ctx, core.Create, request)
-	if resp == nil {
+	resp := c.executeWrapper(core.Create, request)
+	if !resp.Ok {
 		return errCantCreateNewBucket
 	}
 	return nil
@@ -135,13 +132,11 @@ func (c *Client) Create(bucketName string) error {
 
 // Destroy makes RPC for deleting the map on the server
 func (c *Client) Destroy(bucketName string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
-	defer cancel()
 	request := &core.Request{
 		Bucket: bucketName,
 	}
-	resp := c.executeWrapper(ctx, core.Destroy, request)
-	if resp == nil {
+	resp := c.executeWrapper(core.Destroy, request)
+	if !resp.Ok {
 		return errCantDeleteBucket
 	}
 	return nil
@@ -149,10 +144,8 @@ func (c *Client) Destroy(bucketName string) error {
 
 // DestroyAll makes RPC for deleting entire db
 func (c *Client) DestroyAll() error {
-	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
-	defer cancel()
-	resp := c.executeWrapper(ctx, core.DestroyAll, &core.Request{})
-	if resp == nil {
+	resp := c.executeWrapper(core.DestroyAll, &core.Request{})
+	if !resp.Ok {
 		return errCantDeleteBucket
 	}
 	return nil
@@ -160,16 +153,14 @@ func (c *Client) DestroyAll() error {
 
 // Del makes RPC for droping any record from the bucket by a given key
 func (c *Client) Del(bucketName, key string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
-	defer cancel()
 	request := &core.Request{
 		Record: core.Record{
 			Key: key,
 		},
 		Bucket: bucketName,
 	}
-	resp := c.executeWrapper(ctx, core.Del, request)
-	if resp == nil {
+	resp := c.executeWrapper(core.Del, request)
+	if !resp.Ok {
 		return errCantDeleteKey
 	}
 	return nil
@@ -177,8 +168,6 @@ func (c *Client) Del(bucketName, key string) error {
 
 // Set makes RPC for creating the new key value pair in specified bucket
 func (c *Client) Set(bucketName, key string, val interface{}) error {
-	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
-	defer cancel()
 	request := &core.Request{
 		Record: core.Record{
 			Key:   key,
@@ -186,8 +175,8 @@ func (c *Client) Set(bucketName, key string, val interface{}) error {
 		},
 		Bucket: bucketName,
 	}
-	resp := c.executeWrapper(ctx, core.Set, request)
-	if resp == nil {
+	resp := c.executeWrapper(core.Set, request)
+	if !resp.Ok {
 		return errCantSetKeyValuePair
 	}
 	return nil
@@ -195,16 +184,14 @@ func (c *Client) Set(bucketName, key string, val interface{}) error {
 
 // Get makes RPC that returns value by key from one of the buckets
 func (c *Client) Get(bucketName, key string) (interface{}, bool) {
-	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
-	defer cancel()
 	request := &core.Request{
 		Record: core.Record{
 			Key: key,
 		},
 		Bucket: bucketName,
 	}
-	resp := c.executeWrapper(ctx, core.Get, request)
-	if resp == nil {
+	resp := c.executeWrapper(core.Get, request)
+	if !resp.Ok {
 		return nil, false
 	}
 	return resp.Value, true
@@ -212,13 +199,11 @@ func (c *Client) Get(bucketName, key string) (interface{}, bool) {
 
 // MakeIterator makes RPC for creating the new map iterator based on channel
 func (c *Client) MakeIterator(bucketName string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
-	defer cancel()
 	request := &core.Request{
 		Bucket: bucketName,
 	}
-	resp := c.executeWrapper(ctx, core.MakeIter, request)
-	if resp == nil {
+	resp := c.executeWrapper(core.MakeIter, request)
+	if !resp.Ok {
 		return errCantSetKeyValuePair
 	}
 	return nil
@@ -226,13 +211,11 @@ func (c *Client) MakeIterator(bucketName string) error {
 
 // Next makes RPC that returns the next key-value pair according to the iterator state
 func (c *Client) Next(bucketName string) (string, interface{}, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
-	defer cancel()
 	request := &core.Request{
 		Bucket: bucketName,
 	}
-	resp := c.executeWrapper(ctx, core.Next, request)
-	if resp == nil {
+	resp := c.executeWrapper(core.Next, request)
+	if !resp.Ok {
 		return "", nil, errCantGetValue
 	}
 	return resp.Key, resp.Value, nil

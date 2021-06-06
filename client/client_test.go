@@ -15,6 +15,10 @@ const (
 	path = "/tmp/pure-kv-db-client-test"
 )
 
+var (
+	getValueErr = errors.New("Can't get the value from map")
+)
+
 type SomeCustomType struct {
 	Key   string
 	Value map[string]bool
@@ -67,7 +71,7 @@ func TestClient(t *testing.T) {
 	defer prepareServer(t)()
 	time.Sleep(1 * time.Second) // just wait for server to be started
 
-	cli := New("0.0.0.0:6668", 500)
+	cli := New("0.0.0.0:6668", 1000)
 	err := cli.Open()
 	if err != nil {
 		t.Fatal(err)
@@ -106,22 +110,21 @@ func TestClient(t *testing.T) {
 	})
 
 	t.Run("ConcurrentSet", func(t *testing.T) {
-		errs := make(chan error)
-		go func() {
-			wg := sync.WaitGroup{}
-			wg.Add(10)
-			for i := 0; i < 10; i++ {
-				go func() {
-					defer wg.Done()
-					err := cli.Set(bucketName, keys[0], valSet)
-					if err != nil {
-						errs <- err
-					}
-				}()
-			}
-			wg.Wait()
-			close(errs)
-		}()
+		N := 10
+		errs := make(chan error, N)
+		wg := sync.WaitGroup{}
+		wg.Add(10)
+		for i := 0; i < N; i++ {
+			go func() {
+				defer wg.Done()
+				err := cli.Set(bucketName, keys[0], valSet)
+				if err != nil {
+					errs <- err
+				}
+			}()
+		}
+		wg.Wait()
+		close(errs)
 		for err := range errs {
 			if err != nil {
 				t.Error(err)
@@ -131,34 +134,40 @@ func TestClient(t *testing.T) {
 
 	t.Run("GetVal", func(t *testing.T) {
 		tmpVal, ok := cli.Get(bucketName, keys[0])
+		if !ok {
+			t.Fatal(getValueErr)
+		}
 		val := tmpVal.([]byte)
-		if !ok || bytes.Compare(val, valSet) != 0 {
-			t.Error("Can't get the value from map")
+		if bytes.Compare(val, valSet) != 0 {
+			t.Error(getValueErr)
 		}
 	})
 
 	t.Run("ConcurrentGet", func(t *testing.T) {
-		errs := make(chan error)
-		go func() {
-			wg := sync.WaitGroup{}
-			wg.Add(10)
-			for i := 0; i < 10; i++ {
-				go func() {
-					defer wg.Done()
-					tmpVal, ok := cli.Get(bucketName, keys[0])
-					val := tmpVal.([]byte)
-					if !ok || bytes.Compare(val, valSet) != 0 {
-						errs <- errors.New("Can't get the value from map")
-						return
-					}
-				}()
-			}
-			wg.Wait()
-			close(errs)
-		}()
+		N := 10
+		errs := make(chan error, N)
+		wg := sync.WaitGroup{}
+		wg.Add(N)
+		for i := 0; i < N; i++ {
+			go func() {
+				defer wg.Done()
+				tmpVal, ok := cli.Get(bucketName, keys[0])
+				if !ok {
+					errs <- getValueErr
+					return
+				}
+				val := tmpVal.([]byte)
+				if bytes.Compare(val, valSet) != 0 {
+					errs <- getValueErr
+					return
+				}
+			}()
+		}
+		wg.Wait()
+		close(errs)
 		for err := range errs {
 			if err != nil {
-				t.Error(err)
+				t.Fatal(err)
 			}
 		}
 	})
@@ -221,11 +230,14 @@ func TestClient(t *testing.T) {
 	})
 
 	t.Run("DestroyAll", func(t *testing.T) {
-		cli.Create(bucketName)
+		err = cli.Create(bucketName)
+		if err != nil {
+			t.Fatal(err)
+		}
 		cli.Set(bucketName, keys[0], valSet)
 		err = cli.DestroyAll()
 		if err != nil {
-			t.Error(err)
+			t.Fatal(err)
 		}
 		time.Sleep(250 * time.Millisecond)
 		_, ok := cli.Get(bucketName, keys[0])

@@ -18,7 +18,7 @@ type mapIterators struct {
 
 // PureKv main structure for holding maps and key iterators
 type PureKv struct {
-	mx           sync.Mutex
+	mx           sync.RWMutex
 	shardsNumber int
 	iterators    *mapIterators
 	buckets      ConcurrentMap
@@ -70,19 +70,20 @@ func (kv *PureKv) Destroy(req Request, res *Response) error {
 	}()
 	go func() {
 		iterators.Lock()
+		defer iterators.Unlock()
 		delete(iterators.items, req.Bucket)
-		iterators.Unlock()
 	}()
 	res.Ok = true
 	return nil
 }
 
-// DestroyAll drops the entire db
+// DestroyAll resets the entire db
 func (kv *PureKv) DestroyAll(req Request, res *Response) error {
 	kv.mx.Lock()
+	defer kv.mx.Unlock()
+
 	kv.iterators = &mapIterators{items: make(map[string]chan string)}
 	kv.buckets = NewMap(kv.shardsNumber)
-	kv.mx.Unlock()
 	res.Ok = true
 	return nil
 }
@@ -138,8 +139,8 @@ func (kv *PureKv) MakeIterator(req Request, res *Response) error {
 	}
 	iterators := kv.iterators
 	iterators.Lock()
+	defer iterators.Unlock()
 	iterators.items[req.Bucket] = buckets.MapKeysIterator(req.Bucket)
-	iterators.Unlock()
 	res.Ok = true
 	return nil
 }
@@ -177,10 +178,14 @@ func (kv *PureKv) Next(req Request, res *Response) error {
 
 // Dump ...
 func (kv *PureKv) Dump(dbPath string) error {
+	kv.mx.RLock()
+	defer kv.mx.RUnlock()
 	return kv.buckets.Dump(dbPath)
 }
 
 // Load ...
 func (kv *PureKv) Load(dbPath string) error {
+	kv.mx.Lock()
+	defer kv.mx.Unlock()
 	return kv.buckets.Load(dbPath)
 }
