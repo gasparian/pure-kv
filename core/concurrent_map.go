@@ -52,6 +52,7 @@ func (s *MapShard) Deserialize(inp []byte) error {
 	buf := &bytes.Buffer{}
 	buf.Write(inp)
 	dec := gob.NewDecoder(buf)
+	s.Items = make(map[string]Records)
 	err := dec.Decode(s)
 	if err != nil {
 		return err
@@ -279,8 +280,6 @@ func (m ConcurrentMap) Dump(path string) error {
 	err := m.iterShard(
 		func(idx int, sh *MapShard, wg *sync.WaitGroup, errs chan error) {
 			defer wg.Done()
-			sh.mutex.RLock()
-			defer sh.mutex.RUnlock()
 			fpath := filepath.Join(path, strconv.Itoa(idx))
 			errs <- sh.Save(fpath)
 		},
@@ -296,9 +295,6 @@ func (m ConcurrentMap) Load(path string) error {
 	err := m.iterShard(
 		func(idx int, sh *MapShard, wg *sync.WaitGroup, errs chan error) {
 			defer wg.Done()
-			sh.mutex.Lock()
-			defer sh.mutex.Unlock()
-			sh.Items = make(map[string]Records)
 			errs <- sh.Load(filepath.Join(path, strconv.Itoa(idx)))
 		},
 	)
