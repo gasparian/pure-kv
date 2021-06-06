@@ -2,7 +2,7 @@
 ![main tests](https://github.com/gasparian/pure-kv-go/actions/workflows/test.yml/badge.svg?branch=main)
 
 # pure-kv-go  
-Simple and fast in-memory key-value storage with RPC interface, written in go.  
+Simple and fast in-memory key-value storage with RPC interface.  
 
 <p align="center"> <img src="https://github.com/gasparian/pure-kv-go/blob/main/pics/logo.jpg" height=300/> </p>  
 
