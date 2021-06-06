@@ -21,6 +21,7 @@ map-race-test:
 	        -bench=. \
 	        -benchtime=0.05s \
 	        -benchmem \
+			-count=1 \
 	        ./core
 
 test-coverage:
@@ -34,5 +35,4 @@ test:
 	then
 	    path=./...
 	fi
-	go clean -testcache
-	go test -v -cover -coverprofile cover.out -race $$path
+	go test -v -cover -coverprofile cover.out -race -count=1 $$path
