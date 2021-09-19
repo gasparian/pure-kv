@@ -136,3 +136,9 @@ Optionally you can run benchmarks for the concurrent map:
 make map-bench
 make map-race-test
 ```  
+
+### TODO  
+ - add crdt data structures: https://github.com/alangibson/awesome-crdt  
+ - http://archagon.net/blog/2018/03/24/data-laced-with-history/  
+ - add pub/sub so when structure changes (propagate back to client change from another client)  
+ - try lock-free data structures (--> conflict + lock free as a result)
