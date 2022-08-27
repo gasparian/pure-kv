@@ -1,43 +1,131 @@
-![main build](https://github.com/gasparian/pure-kv/actions/workflows/build.yml/badge.svg?branch=main)
 ![main tests](https://github.com/gasparian/pure-kv/actions/workflows/test.yml/badge.svg?branch=main)
 
 # pure-kv  
-Simple and fast in-memory key-value storage with RPC interface.  
+Easy-to-use embedded in-memory key-value storage with ttl and RPC interface.  
 
-<p align="center"> <img src="https://github.com/gasparian/pure-kv/blob/main/pics/logo.jpg" height=300/> </p>  
+<p align="center"> <img src="./pics/logo.jpg" height=300/> </p>  
 
 Features:  
- * uses RPC interface;  
- * uses concurrency-efficient map (in the end, my implementation becomes pretty similar to [this one](https://github.com/orcaman/concurrent-map), but a bit simpler, I think);  
- * stores objects as empty interfaces;  
- * supports buckets so you can organize your storage better;  
- * supports iteration over buckets' contence;  
- * persistant by default;  
- * doesn't depend on third-party libraries;  
+ * doesn't depend on any third-party library;  
+ * could be used both as an embedded storage and as a remote RPC server (RPC client provided);  
+ * uses concurrent hash-map inside;  
+ * could be dumped to disk and restored back with the full state;  
 
-### Install  
+## Install  
 ```
 go get github.com/gasparian/pure-kv
 ```  
 
-### Run server  
+## Run server  
 ```
-make compile
-./pure-kv-srv --port 6666 \
-              --persist_time 60 \
-              --db_path /tmp/pure-kv-db \
-              --shards 32
+make
+./purekv --port 6666 \
+         --shards 32 \
+         --ttl_garbage_timeout 60000 \
 ```  
 
-### Usage  
+## Usage  
+The only thing you need to know about `pure-kv` - you can perform just set/get/del with time-to-live and keep byte arrays *only*. So you can serialize your data with `gob`, for example, and put the result in the store.  
 
-Client:  
+### Embedded  
+You can use [store](https://github.com/gasparian/pure-kv/blob/main/pkg/purekv/store.go) directly in your go code.  
+Here is an example:  
+```go
+
+import (
+    "log"
+    "time"
+	"github.com/gasparian/pure-kv/pkg/purekv"
+)
+
+// Create new store
+store := purekv.NewStore(
+    32,    // number of shards for concurrent map
+    20000, // TTL garbage collector timeout in ms.
+)         
+defer store.Close() // Need to finalize background work
+// Set key providing ttl of 1 s
+err = store.Set("someKey", []byte{'a'}, 1000)
+if err != nil {
+    log.Fatal(err)
+}
+// Get current size of store
+storeSize := store.Size()
+log.Printf("Number of keys in store: %v", storeSize)
+// Get value that has been set before
+val, err := Get("someKey")
+if err != nil {
+    log.Fatal(err)
+}
+log.Printf("Value got from store: %v", val)
+// Check that key became stale
+time.Sleep(time.Duration(1) * time.Second)
+ok = store.Has("someKey")
+if ok {
+    log.Fatal("Key should be already cleaned")
+}
+// Setting a key with 0 ttl means that it 
+// will live until you delete it manually
+store.Set("anotherKey", []byte{'a'}, 0)
+store.Del("anotherKey")
+// Check that it's not presented
+ok = store.Has("anotherKey")
+if ok {
+    log.Fatal("Key `anotherKey` should not be presented")
+}
+// Dump store to disk
+path := "/path/to/db/dump"
+err = store.Dump(path)
+if err != nil {
+    log.Fatal(err)
+}
+// Load store back
+storeLoaded, err := purekv.Load(path)
+defer storeLoaded.Close()
+if err != nil {
+    log.Fatal(err)
+}
+log.Printf("Store loaded successfully, size: %v", storeLoaded.Size())
+// Drop all entries in store and check it
+err = store.DelAll()
+if err != nil {
+    log.Fatal(err)
+}
+storeSize = storeLoaded.Size()
+if storeSize != 0 {
+    log.Fatal("Store should not contain entries after deletion")
+}
+```  
+
+### RPC  
+
+Run [server:](https://github.com/gasparian/pure-kv/blob/main/internal/server/server.go)  
+```go
+package main
+
+import (
+    pkv "github.com/gasparian/pure-kv/internal/server"
+)
+
+func main() {
+    flag.Parse()
+    srv := pkv.InitServer(
+        6666,  // port
+        32,    // number of shards for concurrent map
+        60000, // TTL garbage collector timeout in ms.
+    )
+    srv.Start() // <-- blocks
+}
+```  
+
+[Client](https://github.com/gasparian/pure-kv/blob/main/internal/client/client.go) usage example:  
+
 ```go
 package main
 
 import (
     "log"
-    pkv "github.com/gasparian/pure-kv/client"
+    pkv "github.com/gasparian/pure-kv/internal/client"
 )
 
 func main() {
@@ -48,79 +136,27 @@ func main() {
     if err != nil {
         log.Fatal(err)
     }
-    // creates the new bucket with specified key-value pair type
-    err = cli.Create("BucketName") 
+    // Creates new key-value pair with ttl of 1 sec.
+    err = cli.Set("someKey", []byte{'a'}, 1000) 
     if err != nil {
         log.Fatal(err)
     }
-    // creates new key-value pair in the specified bucket
-    err = cli.Set("BucketName", "someKey", []byte{'a'}) 
-    if err != nil {
-        log.Fatal(err)
-    }
-    // returns value
-    tmpVal, ok := cli.Get("BucketName", "someKey") 
-    // you cast the result back to original type
-    val := tmpVal.([]byte) 
+    // Returns set value
+    tmpVal, ok := cli.Get("someKey") 
     if !ok {
         log.Fatal("Can't get a value")
     }    
     log.Println(val)
-    // returns size of specified bucket
-    bucketSize, err := cli.Size("BucketName") 
-    if err != nil {
-        log.Fatal(err)
-    }
-    log.Println(bucketSize)
-    // makes new iterator for specified bucket
-    err = cli.MakeIterator("BucketName")
-    if err != nil {
-        log.Fatal(err)
-    }
-    // get next element of bucket
-    k, tmpVal, err := cli.Next("BucketName") 
-    if err != nil {
-        log.Fatal(err)
-    }
-    log.Println(k, tmpVal)
-    // returns total number of records in storage
-    size, err := cli.Size("")
-    if err != nil {
-        log.Fatal(err)
-    }
+    // Returns number of elements in store
+    size := cli.Size() 
     log.Println(size)
-    // async. delete value from the bucket
-    err = cli.Del("BucketName", "someKey") 
+    // Async. delete value from the bucket
+    err = cli.Del("someKey")
     if err != nil {
         log.Fatal(err)
     }
-    // async. delete the specified bucket
-    err = cli.Destroy("BucketName") 
-    if err != nil {
-        log.Fatal(err)
-    }
-    // recreates the entire db, deleting everything
-    cli.DestroyAll() 
-}
-```  
-
-[Server:](https://github.com/gasparian/pure-kv/blob/main/main.go)  
-```go
-package main
-
-import (
-    pkv "github.com/gasparian/pure-kv/server"
-)
-
-func main() {
-    flag.Parse()
-    srv := pkv.InitServer(
-        6666, // port
-        60, // persistence timeout sec.
-        32, // number of shards for concurrent map
-        "/tmp/pure-kv-db", // db path
-    )
-    srv.Run() // <-- blocks
+    // Recreates the entire db, deleting everything
+    cli.DelAll() 
 }
 ```  
 
@@ -128,18 +164,34 @@ func main() {
 
 You can run tests by package or left argument empty to run all the tests:  
 ```
-make test path={PACKAGE}
+make test
 ```  
 
-Optionally you can run benchmarks for the concurrent map:  
+Run `store` benchmark:  
 ```
-make map-bench
-make map-race-test
+make benchmark
 ```  
+The main idea of this benchmark is to see how concurrent access and the number of shards in store affects it's performance.  
 
-### TODO  
- - add crdt data structures: 
-     - https://github.com/alangibson/awesome-crdt  
-     - http://archagon.net/blog/2018/03/24/data-laced-with-history/  
- - add pub/sub so when structure changes (propagate back to client change from another client)  
- - add here bench results of the current implementation  
+#### Benchmark results  
+I ran benchmark test on my laptop with the following configuration:  
+```
+goos: darwin
+goarch: amd64
+cpu: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz
+gomaxprocs: 12
+```  
+Below you can find graphs for simulation of 100 serial/concurrent sets/gets.  
+First case is when `ttl` has been completely turned off:  
+<p align="center"> <img src="./pics/100_no_ttl.svg" width=600/> </p>  
+
+Second case - when we use `ttl`:  
+<p align="center"> <img src="./pics/100_ttl.svg" width=600/> </p>  
+
+In both cases you can see an improvement when using concurrent access, but the effect of adding more shards in our concurrent map quickly disappears, after 5 shards.  
+As you can see, the largest improvement belongs to concurrent sets: ~25% for experiment without keys ttl and >200% for the experiment with ttl (max. 32 shards).  
+But at the same time it looks like "gets" are more "stable", and just a single shard (which is effectively just a map with mutex lock) already does the job.  
+The metodology of an experiment is simple and not ideal, of course. Possibly we could see more improvement on a larger-scale experiments.  
+
+### Things to improve  
+Now, keys with expiry times are stored in min heap, and this heap is being update with new entries through channels, which are unique for every shard. And on store start-up some amount of goroutines are spawned (number is equal to the number of shards), which may be not the best solution (see the code [here](https://github.com/gasparian/pure-kv/blob/main/pkg/purekv/store.go#L139)). On the other hand - these goroutines by default just waits for the new entry in the channel, which comes from the next `Set` operation, in case ttl has been set, but it could a problem when there are a lot of sets and these goroutines could take more and more CPU time.  
