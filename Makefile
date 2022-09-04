@@ -1,38 +1,27 @@
 .SILENT:
 
-compile:
-	go fmt ./...
-	go build -o pure-kv-srv
+.DEFAULT_GOAL := build
 
-map-bench:
-	go test -v \
-	        -run=XXX \
-	        -bench=. \
-	        -benchtime=0.2s \
-	        -benchmem \
-	        -memprofile memprofile.out \
-	        -cpuprofile profile.out \
-	        ./core
+build:
+	go build -ldflags '-w -extldflags "-static"' -v -o purekv ./cmd/rpcserver
 
-map-race-test:
+benchmark:
 	go test -v \
-	        -race \
-	        -run=XXX \
-	        -bench=. \
-	        -benchtime=0.05s \
-	        -benchmem \
-			-count=1 \
-	        ./core
+	    -run=XXX \
+	    -bench=. \
+	    -benchtime=0.2s \
+	    -benchmem \
+	    -memprofile memprofile.prof \
+	    -cpuprofile cpuprofile.prof \
+		-count=1 \
+		-timeout 300s \
+	    ./pkg/purekv
 
 test-coverage:
 	go tool cover -func cover.out | grep total | awk '{print $$3}'
 
-.ONESHELL:
-.SHELLFLAGS=-e -c
 test:
-	path=$(path)
-	if [ -z "$$path" ]
-	then
-	    path=./...
-	fi
-	go test -v -cover -coverprofile cover.out -race -count=1 $$path
+	go test -v -cover -coverprofile cover.out -race -count=1 -timeout 30s ./...
+
+install-hooks:
+	cp -rf .githooks/pre-commit .git/hooks/pre-commit
