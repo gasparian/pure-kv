@@ -7,8 +7,9 @@ Easy-to-use embedded in-memory key-value storage with ttl and RPC interface.
 
 Features:  
  * doesn't depend on any third-party library;  
- * could be used both as an embedded storage and as a remote RPC server (RPC client provided);  
  * uses concurrent hash-map inside;  
+ * time-to-live could be set to keys;  
+ * could be used both as an embedded storage and as a remote RPC server (RPC client provided);  
  * could be dumped to disk and restored back with the full state;  
 
 ## Install  
