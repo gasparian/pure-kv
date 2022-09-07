@@ -22,3 +22,4 @@ pure-kv-srv
 /purekv
 *.prof
 *_bin
+*.DS_Store

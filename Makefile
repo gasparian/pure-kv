@@ -3,7 +3,9 @@
 .DEFAULT_GOAL := build
 
 build:
-	go build -ldflags '-w -extldflags "-static"' -v -o purekv ./cmd/rpcserver
+	go build \
+	    -ldflags '-w -extldflags "-static"' \
+		-v -o purekv ./cmd/rpcserver 
 
 benchmark:
 	go test -v \
