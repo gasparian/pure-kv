@@ -43,6 +43,7 @@ import (
 store := purekv.NewStore(
     32,    // number of shards for concurrent map
     20000, // TTL garbage collector timeout in ms.
+           // setting 0 means turn off keys removal at all
 )         
 defer store.Close() // Need to finalize background work
 // Set key providing ttl of 1 s
@@ -175,6 +176,7 @@ make benchmark
 The main idea of this benchmark is to see how concurrent access and the number of shards in store affects it's performance.  
 
 #### Benchmark results  
+*TODO: update*
 I ran benchmark test on my laptop with the following configuration:  
 ```
 goos: darwin
@@ -183,16 +185,16 @@ cpu: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz
 gomaxprocs: 12
 ```  
 Below you can find graphs for simulation of 100 serial/concurrent sets/gets.  
-First case is when `ttl` has been completely turned off:  
+First case is when `ttl` has been **turned off**:  
 <p align="center"> <img src="./pics/100_no_ttl.svg" width=600/> </p>  
 
 Second case - when we use `ttl`:  
 <p align="center"> <img src="./pics/100_ttl.svg" width=600/> </p>  
 
-In both cases you can see an improvement when using concurrent access, but the effect of adding more shards in our concurrent map quickly disappears, after 5 shards.  
-As you can see, the largest improvement belongs to concurrent sets: ~25% for experiment without keys ttl and >200% for the experiment with ttl (max. 32 shards).  
+In both cases you can see an improvement when using concurrent access, but the effect of adding more shards in our concurrent map quickly disappears, after ~4-8 shards.  
+As you can see, the largest improvement belongs to concurrent sets: >30% for experiment without keys ttl and >200% for the experiment with ttl (max. 32 shards).  
 But at the same time it looks like "gets" are more "stable", and just a single shard (which is effectively just a map with mutex lock) already does the job.  
-The metodology of an experiment is simple and not ideal, of course. Possibly we could see more improvement on a larger-scale experiments.  
+The methodology of an experiment is simple and far from ideal, of course. Possibly we could see more improvement on a larger-scale experiments.  
 
 ### Things to improve  
-Now, keys with expiry times are stored in min heap, and this heap is being update with new entries through channels, which are unique for every shard. And on store start-up some amount of goroutines are spawned (number is equal to the number of shards), which may be not the best solution (see the code [here](https://github.com/gasparian/pure-kv/blob/main/pkg/purekv/store.go#L139)). On the other hand - these goroutines by default just waits for the new entry in the channel, which comes from the next `Set` operation, in case ttl has been set, but it could a problem when there are a lot of sets and these goroutines could take more and more CPU time.  
+Now, keys with expiry times are stored in a min heap, and this heap is being update with new entries through channels, which are unique for every shard. And on store start-up some amount of goroutines are spawned (number is equal to the number of shards), which may be not the best solution (see the code [here](https://github.com/gasparian/pure-kv/blob/main/pkg/purekv/store.go#L139)). On the other hand - these goroutines by default just waits for the new entry in the channel, which comes from the next `Set` operation, in case ttl has been set, but it could a problem when there are a lot of sets and these goroutines could take more and more CPU time.  

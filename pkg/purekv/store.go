@@ -19,23 +19,23 @@ const (
 
 // entry represents value to be stored
 type entry struct {
-	Expiry *time.Time
+	Expiry time.Time
 	Data   []byte
 }
 
 type ttlEntry struct {
-	Expiry *time.Time
+	Expiry time.Time
 	Key    string
 }
 
 // shard is just as regular map but with mutex
 type shard struct {
 	mutex         sync.RWMutex
-	heapInputChan chan *ttlEntry
+	heapInputChan chan ttlEntry
 	Items         map[string]*entry
 }
 
-func newShard(heapInputChan chan *ttlEntry) *shard {
+func newShard(heapInputChan chan ttlEntry) *shard {
 	return &shard{
 		heapInputChan: heapInputChan,
 		Items:         make(map[string]*entry),
@@ -47,7 +47,7 @@ func (sh *shard) getVal(key string) ([]byte, bool) {
 	sh.mutex.RLock()
 	defer sh.mutex.RUnlock()
 	val, ok := sh.Items[key]
-	if ok && (val.Expiry == nil || (val.Expiry != nil && val.Expiry.After(time.Now()))) {
+	if ok && (val.Expiry.IsZero() || (!val.Expiry.IsZero() && val.Expiry.After(time.Now()))) {
 		return val.Data, true
 	}
 	return nil, false
@@ -55,12 +55,12 @@ func (sh *shard) getVal(key string) ([]byte, bool) {
 
 type ttlHeapSynced struct {
 	mutex   sync.RWMutex
-	TTLHeap *Heap[*ttlEntry]
+	TTLHeap *Heap[ttlEntry]
 }
 
 func newTTLHeapSynced() *ttlHeapSynced {
 	return &ttlHeapSynced{
-		TTLHeap: NewHeap(func(a, b *ttlEntry) bool { return a.Expiry.Before(*b.Expiry) }),
+		TTLHeap: NewHeap(func(a, b ttlEntry) bool { return a.Expiry.Before(b.Expiry) }),
 	}
 }
 
@@ -70,13 +70,13 @@ func (ths *ttlHeapSynced) len() int {
 	return ths.TTLHeap.Len()
 }
 
-func (ths *ttlHeapSynced) push(inp *ttlEntry) {
+func (ths *ttlHeapSynced) push(inp ttlEntry) {
 	ths.mutex.Lock()
 	defer ths.mutex.Unlock()
 	ths.TTLHeap.Push(inp)
 }
 
-func (ths *ttlHeapSynced) pop() *ttlEntry {
+func (ths *ttlHeapSynced) pop() ttlEntry {
 	ths.mutex.Lock()
 	defer ths.mutex.Unlock()
 	return ths.TTLHeap.Pop()
@@ -94,7 +94,7 @@ type Store struct {
 	config            *storeConfig
 	shards            []*shard
 	keysTTLHeap       *ttlHeapSynced
-	heapInputChans    []chan *ttlEntry
+	heapInputChans    []chan ttlEntry
 	exitChan          chan struct{}
 }
 
@@ -115,12 +115,12 @@ func instantiateStore(config *storeConfig) *Store {
 	store := &Store{
 		config:         config,
 		shards:         make([]*shard, config.ShardsNumber),
-		heapInputChans: make([]chan *ttlEntry, config.ShardsNumber),
+		heapInputChans: make([]chan ttlEntry, config.ShardsNumber),
 		exitChan:       make(chan struct{}),
 	}
 	store.keysTTLHeap = newTTLHeapSynced()
 	for i := 0; i < config.ShardsNumber; i++ {
-		inputChan := make(chan *ttlEntry)
+		inputChan := make(chan ttlEntry)
 		store.heapInputChans[i] = inputChan
 		store.shards[i] = newShard(inputChan)
 	}
@@ -138,7 +138,7 @@ func (s *Store) Close() {
 
 func (s *Store) startTTLGarbageCollector() {
 	for _, ch := range s.heapInputChans {
-		go func(inputChan chan *ttlEntry) {
+		go func(inputChan chan ttlEntry) {
 			for {
 				select {
 				case <-s.exitChan:
@@ -160,7 +160,7 @@ func (s *Store) startTTLGarbageCollector() {
 				heapCurrentLen := s.keysTTLHeap.len()
 				for i := 0; i < heapCurrentLen; i++ {
 					topExpiry := s.keysTTLHeap.TTLHeap.ViewTop().Expiry
-					if topExpiry != nil && now.After(*topExpiry) {
+					if !topExpiry.IsZero() && now.After(topExpiry) {
 						ttlHeapEntry := s.keysTTLHeap.pop()
 						s.Del(ttlHeapEntry.Key)
 					} else {
@@ -203,16 +203,16 @@ func (s *Store) Set(key string, value []byte, ttlMs int) error {
 	sh := s.getShard(key)
 	sh.mutex.Lock()
 	defer sh.mutex.Unlock()
-	sh.Items[key] = &entry{Data: value}
+	e := &entry{Data: value}
 	if ttlMs > 0 {
-		ttl := time.Now().Add(time.Millisecond * time.Duration(ttlMs))
-		sh.Items[key].Expiry = &ttl
-		ttl2 := ttl // NOTE: create a copy in order to avoid race condition
-		sh.heapInputChan <- &ttlEntry{
+		exp := time.Now().Add(time.Millisecond * time.Duration(ttlMs))
+		e.Expiry = exp
+		sh.heapInputChan <- ttlEntry{
 			Key:    key,
-			Expiry: &ttl2,
+			Expiry: exp,
 		}
 	}
+	sh.Items[key] = e
 	return nil
 }
 
