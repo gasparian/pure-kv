@@ -36,7 +36,7 @@ Here is an example:
 import (
     "log"
     "time"
-	"github.com/gasparian/pure-kv/pkg/purekv"
+    "github.com/gasparian/pure-kv/pkg/purekv"
 )
 
 // Create new store
@@ -176,7 +176,6 @@ make benchmark
 The main idea of this benchmark is to see how concurrent access and the number of shards in store affects it's performance.  
 
 #### Benchmark results  
-*TODO: update*
 I ran benchmark test on my laptop with the following configuration:  
 ```
 goos: darwin
